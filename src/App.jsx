@@ -77,30 +77,72 @@ function App() {
 
   async function createBooking(e){
     e.preventDefault();
+
     const count=newBooking.type==='singles'?2:4;
     const picked=newBooking.players.slice(0,count);
-    if(picked.some(x=>!x)){setNotice('Seleziona tutti i soci o indica gli ospiti.');return;}
+
+    const guestAllowed = newBooking.type === 'singles' ? [1] : [2,3];
+
+    if(picked.some((x,i)=>x==='guest' && !guestAllowed.includes(i))){
+      setNotice('Un ospite esterno non può occupare questa posizione.');
+      return;
+    }
+
+    if(picked.some(x=>!x)){
+      setNotice('Seleziona tutti i soci o indica gli ospiti.');
+      return;
+    }
+
     const start=new Date(`${selectedDate}T${newBooking.time}:00`);
-    const end=new Date(start.getTime()+60*60000);
-    if(start<new Date()){setNotice('Non puoi prenotare un orario già passato.');return;}
+    if(start<new Date()){
+      setNotice('Non puoi prenotare un orario già passato.');
+      return;
+    }
+
     const participants=picked.map((id,i)=>{
       const member=members.find(m=>m.id===id);
       const guest=newBooking.guests[i]?.trim();
-      return member?{member_id:member.id,display_name:member.full_name}:{member_id:null,display_name:guest};
+      return member
+        ? {member_id:member.id,display_name:member.full_name}
+        : id==='guest'
+          ? {member_id:null,display_name:guest}
+          : {member_id:null,display_name:''};
     });
-    if(participants.some(p=>!p.display_name)){setNotice('Completa i nomi dei partecipanti.');return;}
+
+    if(participants.some(p=>!p.display_name)){
+      setNotice('Completa i nomi dei partecipanti.');
+      return;
+    }
+
     const {data,error}=await supabase.rpc('create_booking',{
-      p_court_id:Number(newBooking.court_id),p_booking_date:selectedDate,p_start_time:newBooking.time,
-      p_booking_type:newBooking.type,p_players:participants
+      p_court_id:Number(newBooking.court_id),
+      p_booking_date:selectedDate,
+      p_start_time:newBooking.time,
+      p_booking_type:newBooking.type,
+      p_players:participants
     });
-    if(error){setNotice(error.message.includes('member_already_booked')?'Uno dei soci selezionati ha già una prenotazione attiva.':error.message.includes('slot_unavailable')?'Questo orario è già occupato.':error.message);return;}
-    setNotice('Prenotazione confermata!');setShowBooking(false);await loadData();
+
+    if(error){
+      setNotice(
+        error.message.includes('member_already_booked')
+          ? 'Uno dei soci selezionati ha già una prenotazione attiva.'
+          : error.message.includes('slot_unavailable')
+            ? 'Questo orario è già occupato.'
+            : error.message
+      );
+      return;
+    }
+
+    setNotice('Prenotazione confermata!');
+    setShowBooking(false);
+    await loadData();
   }
 
   async function cancelBooking(id){
     if(!confirm('Vuoi cancellare questa prenotazione?')) return;
     const {error}=await supabase.from('bookings').update({status:'cancelled'}).eq('id',id);
-    setNotice(error?error.message:'Prenotazione cancellata.');await loadData();
+    setNotice(error?error.message:'Prenotazione cancellata.');
+    await loadData();
   }
 
   async function addMember(e){
@@ -113,14 +155,12 @@ function App() {
 
     if(error){
       let detail=error.message;
-
       try{
         if(error.context && typeof error.context.json==='function'){
           const response=await error.context.json();
           detail=response.error || response.message || detail;
         }
       }catch{}
-
       setNotice('Errore creazione socio: '+detail);
       return;
     }
@@ -140,10 +180,15 @@ function App() {
   if(!session) return <main className="login-shell">
     <div className="login-art">
       <div className="brand"><span className="brand-mark"><CircleDot/></span><span>TCP<span className="brand-dot">.</span></span></div>
-      <div className="art-copy"><span className="eyebrow">IL TUO CLUB, IL TUO CAMPO</span><h1>Il prossimo<br/><em>match</em> inizia qui.</h1><p>Prenota il campo, scegli i compagni e scendi in gioco.</p></div>
+      <div className="art-copy">
+        <span className="eyebrow">IL TUO CLUB, IL TUO CAMPO</span>
+        <h1>Il prossimo<br/><em>match</em> inizia qui.</h1>
+        <p>Prenota il campo, scegli i compagni e scendi in gioco.</p>
+      </div>
       <div className="court-lines"><i/><i/><i/><i/></div>
       <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
     </div>
+
     <section className="login-panel">
       <div className="mobile-brand">TENNIS CLUB <b>PABILLONIS</b></div>
       <div className="login-card">
@@ -166,9 +211,15 @@ function App() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><CircleDot/></span><span>TCP<span className="brand-dot">.</span></span></div>
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
-      <nav><span className="nav-active"><CalendarDays size={18}/> Prenotazioni</span>{isAdmin&&<span><ShieldCheck size={18}/> Gestione soci</span>}</nav>
+      <nav>
+        <span className="nav-active"><CalendarDays size={18}/> Prenotazioni</span>
+        {isAdmin&&<span><ShieldCheck size={18}/> Gestione soci</span>}
+      </nav>
       <div className="sidebar-bottom">
-        <div className="profile-mini"><span className="avatar">{profile?.full_name?.[0]||'S'}</span><div><b>{profile?.full_name}</b><small>{isAdmin?'Amministratore':'Socio'}</small></div></div>
+        <div className="profile-mini">
+          <span className="avatar">{profile?.full_name?.[0]||'S'}</span>
+          <div><b>{profile?.full_name}</b><small>{isAdmin?'Amministratore':'Socio'}</small></div>
+        </div>
         <button className="logout" onClick={logout}><LogOut size={17}/> Esci</button>
       </div>
     </aside>
@@ -179,11 +230,20 @@ function App() {
         <div className="top-actions"><span className="live-dot">Sistema attivo</span><span className="avatar large">{profile?.full_name?.[0]||'S'}</span></div>
       </header>
 
-      <section className="welcome-strip"><div><Sparkles size={18}/><span>È il momento di giocare. Scegli il tuo prossimo slot.</span></div><span>2 CAMPI · 60 MINUTI</span></section>
+      <section className="welcome-strip">
+        <div><Sparkles size={18}/><span>È il momento di giocare. Scegli il tuo prossimo slot.</span></div>
+        <span>2 CAMPI · 60 MINUTI</span>
+      </section>
 
       <section className="date-section">
         <div><span className="eyebrow">CALENDARIO</span><h2>Le disponibilità</h2></div>
-        <div className="date-tabs">{days.map((d,i)=><button key={i} onClick={()=>setSelectedDate(dateKey(d))} className={selectedDate===dateKey(d)?'date-tab selected':''}><small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small><b>{pad(d.getDate())}</b><span>{d.toLocaleDateString('it-IT',{month:'short'})}</span></button>)}</div>
+        <div className="date-tabs">
+          {days.map((d,i)=><button key={i} onClick={()=>setSelectedDate(dateKey(d))} className={selectedDate===dateKey(d)?'date-tab selected':''}>
+            <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
+            <b>{pad(d.getDate())}</b>
+            <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
+          </button>)}
+        </div>
       </section>
 
       <div className="booking-toolbar">
@@ -198,10 +258,26 @@ function App() {
 
       <section className="courts-grid">
         {[1,2].filter(c=>court==='all'||String(c)===court).map(c=><article className="court-card" key={c}>
-          <div className="court-head"><div><span className="eyebrow">CAMPO {c===1?'01':'02'}</span><h3>Campo {c}</h3></div><span className="court-status"><i/> Disponibile</span></div>
-          <div className="court-visual"><div className="court-drawing"><div className="court-inner"><div className="court-mid"/><div className="court-net"/></div></div><span className="court-caption">TENNIS CLUB PABILLONIS</span></div>
+          <div className="court-head">
+            <div><span className="eyebrow">CAMPO {c===1?'01':'02'}</span><h3>Campo {c}</h3></div>
+            <span className="court-status"><i/> Disponibile</span>
+          </div>
+          <div className="court-visual">
+            <div className="court-drawing"><div className="court-inner"><div className="court-mid"/><div className="court-net"/></div></div>
+            <span className="court-caption">TENNIS CLUB PABILLONIS</span>
+          </div>
           <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
-          <div className="slots">{hours.map(t=>{const b=bookingAt(c,t);const past=selectedDate===dateKey(today)&&t<=`${pad(today.getHours())}:00`;return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}><span>{t}</span>{b?<div className="slot-info"><b>{playerNames(b)}</b><small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small></div>:<small>{past?'Passato':'Libero'}</small>}{b&&(b.owner_id===session.user.id||isAdmin)&&<button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}><X size={14}/></button>}</div>})}</div>
+          <div className="slots">
+            {hours.map(t=>{
+              const b=bookingAt(c,t);
+              const past=selectedDate===dateKey(today)&&t<=`${pad(today.getHours())}:00`;
+              return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}>
+                <span>{t}</span>
+                {b?<div className="slot-info"><b>{playerNames(b)}</b><small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small></div>:<small>{past?'Passato':'Libero'}</small>}
+                {b&&(b.owner_id===session.user.id||isAdmin)&&<button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}><X size={14}/></button>}
+              </div>;
+            })}
+          </div>
         </article>)}
       </section>
 
@@ -223,12 +299,41 @@ function App() {
 
     {showBooking&&<div className="modal-backdrop" onClick={()=>setShowBooking(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-top"><div><span className="eyebrow">NUOVA PRENOTAZIONE</span><h2>Scendi in campo.</h2></div><button className="icon-button" onClick={()=>setShowBooking(false)}><X/></button></div>
+        <div className="modal-top">
+          <div><span className="eyebrow">NUOVA PRENOTAZIONE</span><h2>Scendi in campo.</h2></div>
+          <button className="icon-button" onClick={()=>setShowBooking(false)}><X/></button>
+        </div>
         <form onSubmit={createBooking}>
           <label>Campo<select value={newBooking.court_id} onChange={e=>setNewBooking({...newBooking,court_id:e.target.value})}><option value="1">Campo 1</option><option value="2">Campo 2</option></select></label>
           <label>Orario<select value={newBooking.time} onChange={e=>setNewBooking({...newBooking,time:e.target.value})}>{hours.map(h=><option key={h} value={h}>{h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}</option>)}</select></label>
           <label>Tipo di partita<select value={newBooking.type} onChange={e=>setNewBooking({...newBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}><option value="singles">Singolo · 2 giocatori</option><option value="doubles">Doppio · 4 giocatori</option></select></label>
-          <div className="player-fields"><b>Giocatori</b>{Array.from({length:newBooking.type==='singles'?2:4},(_,i)=><div className="player-row" key={i}><span>{i+1}</span><select value={newBooking.players[i]||''} onChange={e=>{const a=[...newBooking.players];a[i]=e.target.value;const g=[...newBooking.guests];g[i]='';setNewBooking({...newBooking,players:a,guests:g});}}><option value="">Scegli socio oppure ospite</option><option value="guest">Ospite esterno</option>{members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id).map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}</select>{newBooking.players[i]==='guest'&&<input placeholder="Nome e cognome ospite" value={newBooking.guests[i]||''} onChange={e=>{const a=[...newBooking.guests];a[i]=e.target.value;setNewBooking({...newBooking,guests:a});}} required/>}</div>)}</div>
+
+          <div className="player-fields">
+            <b>Giocatori</b>
+            {Array.from({length:newBooking.type==='singles'?2:4},(_,i)=>{
+              const guestAllowed = newBooking.type==='singles' ? i===1 : i>=2;
+              return <div className="player-row" key={i}>
+                <span>{i+1}</span>
+                <select value={newBooking.players[i]||''} onChange={e=>{
+                  const a=[...newBooking.players];
+                  a[i]=e.target.value;
+                  const g=[...newBooking.guests];
+                  g[i]='';
+                  setNewBooking({...newBooking,players:a,guests:g});
+                }}>
+                  <option value="">Scegli socio{guestAllowed?' oppure ospite':''}</option>
+                  {guestAllowed&&<option value="guest">Ospite esterno</option>}
+                  {members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id).map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+                </select>
+                {newBooking.players[i]==='guest'&&guestAllowed&&<input placeholder="Nome e cognome ospite" value={newBooking.guests[i]||''} onChange={e=>{
+                  const a=[...newBooking.guests];
+                  a[i]=e.target.value;
+                  setNewBooking({...newBooking,guests:a});
+                }} required/>}
+              </div>;
+            })}
+          </div>
+
           <div className="modal-note"><Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo</div>
           <button className="primary wide" type="submit">Conferma prenotazione <ArrowRight size={17}/></button>
         </form>
@@ -238,15 +343,22 @@ function App() {
 }
 
 function SetupScreen(){
-  return <div className="setup-screen"><div className="setup-card">
-    <div className="brand"><span className="brand-mark"><CircleDot/></span><span>TCP<span className="brand-dot">.</span></span></div>
-    <span className="eyebrow">CONFIGURAZIONE INIZIALE</span>
-    <h1>Il club sta per<br/><em>scendere in campo.</em></h1>
-    <p>La parte grafica è pronta. Per attivare accessi e prenotazioni condivise occorre collegare il progetto al database Supabase gratuito.</p>
-    <ol><li>Crea un progetto su Supabase.</li><li>Esegui lo script <code>supabase/schema.sql</code> nel SQL Editor.</li><li>Copia URL e chiave anonima nel file <code>.env</code>.</li><li>Crea il primo utente amministratore e imposta il suo profilo come <code>admin</code>.</li></ol>
-    <div className="setup-warning"><ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.</div>
-    <p className="muted">Consulta il file README incluso nel progetto per la procedura completa e le funzioni server necessarie.</p>
-  </div></div>;
+  return <div className="setup-screen">
+    <div className="setup-card">
+      <div className="brand"><span className="brand-mark"><CircleDot/></span><span>TCP<span className="brand-dot">.</span></span></div>
+      <span className="eyebrow">CONFIGURAZIONE INIZIALE</span>
+      <h1>Il club sta per<br/><em>scendere in campo.</em></h1>
+      <p>La parte grafica è pronta. Per attivare accessi e prenotazioni condivise occorre collegare il progetto al database Supabase gratuito.</p>
+      <ol>
+        <li>Crea un progetto su Supabase.</li>
+        <li>Esegui lo script <code>supabase/schema.sql</code> nel SQL Editor.</li>
+        <li>Copia URL e chiave anonima nel file <code>.env</code>.</li>
+        <li>Crea il primo utente amministratore e imposta il suo profilo come <code>admin</code>.</li>
+      </ol>
+      <div className="setup-warning"><ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.</div>
+      <p className="muted">Consulta il file README incluso nel progetto per la procedura completa e le funzioni server necessarie.</p>
+    </div>
+  </div>;
 }
 
 export default App;
