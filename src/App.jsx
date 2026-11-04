@@ -63,8 +63,10 @@ function TennisCourt() {
           </linearGradient>
         </defs>
 
+        {/* Fondo blu */}
         <rect width="720" height="300" fill="url(#tennisOuter)"/>
 
+        {/* Superficie del campo */}
         <rect
           x="140"
           y="48"
@@ -73,29 +75,25 @@ function TennisCourt() {
           fill="url(#tennisSurface)"
         />
 
+        {/* Linee bianche del campo */}
         <g
           fill="none"
           stroke="#ffffff"
           strokeWidth="3"
-          strokeLinecap="square"
         >
-          {/* Perimetro del campo */}
+          {/* Perimetro esterno */}
           <rect x="140" y="48" width="440" height="204"/>
 
           {/* Linee laterali del singolare */}
-          <line x1="185" y1="48" x2="185" y2="252"/>
-          <line x1="535" y1="48" x2="535" y2="252"/>
+          <line x1="140" y1="92" x2="580" y2="92"/>
+          <line x1="140" y1="208" x2="580" y2="208"/>
 
           {/* Linee di servizio */}
-          <line x1="250" y1="92" x2="470" y2="92"/>
-          <line x1="250" y1="208" x2="470" y2="208"/>
+          <line x1="250" y1="92" x2="250" y2="208"/>
+          <line x1="470" y1="92" x2="470" y2="208"/>
 
           {/* Linea centrale di servizio */}
-          <line x1="360" y1="92" x2="360" y2="208"/>
-
-          {/* Segni centrali sulle linee di fondo */}
-          <line x1="140" y1="150" x2="151" y2="150"/>
-          <line x1="569" y1="150" x2="580" y2="150"/>
+          <line x1="250" y1="150" x2="470" y2="150"/>
         </g>
 
         {/* Rete centrale */}
