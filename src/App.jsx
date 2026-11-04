@@ -1,8 +1,7 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
-  Sparkles, X, KeyRound, LockKeyhole
+  Sparkles, X, KeyRound, LockKeyhole, ChevronDown
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
@@ -53,6 +52,7 @@ function App() {
   const [newAdmin,setNewAdmin] = useState({name:'',surname:'',email:'',password:''});
   const [savingAdmin,setSavingAdmin] = useState(false);
   const [activeView,setActiveView] = useState('bookings');
+  const [openMemberMenu,setOpenMemberMenu] = useState(null);
   const [newBooking,setNewBooking] = useState({
     court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']
   });
@@ -297,8 +297,7 @@ function App() {
 
     const email=prompt('Email del socio:',member.email||'');
     if(email===null) return;
-
-    if(!name.trim()||!surname.trim()||!email.trim()){
+        if(!name.trim()||!surname.trim()||!email.trim()){
       setNotice('Nome, cognome ed email sono obbligatori.');
       return;
     }
@@ -581,8 +580,7 @@ function App() {
           </article>)}
         </section>
       </>}
-
-      {activeView==='members'&&isAdmin&&<section className="admin-panel">
+            {activeView==='members'&&isAdmin&&<section className="admin-panel">
         <div className="admin-heading">
           <div>
             <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
@@ -616,20 +614,52 @@ function App() {
           {allMembers.length===0
             ? <p className="muted">Nessun socio presente.</p>
             : allMembers.map(m=><div className="admin-list-row" key={m.id}>
-                <div>
+                <div className="member-info">
                   <b>{m.full_name}</b>
-                  <small>
-                    {m.status==='active'?'Attivo':m.status==='suspended'?'Sospeso':'Eliminato'}
+                  <small className={`member-status ${
+                    m.status==='active'?'status-active':
+                    m.status==='suspended'?'status-suspended':'status-deleted'
+                  }`}>
+                    <i/>
+                    {m.status==='active'?'Attivo':
+                      m.status==='suspended'?'Sospeso':'Eliminato'}
                   </small>
                 </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:'8px',alignItems:'center'}}>
-                  <button type="button" onClick={()=>editMember(m)}>Modifica</button>
-                  {m.status==='active'&&
-                    <button type="button" onClick={()=>setMemberStatus(m,'suspended')}>Sospendi</button>}
-                  {m.status==='suspended'&&
-                    <button type="button" onClick={()=>setMemberStatus(m,'active')}>Riattiva</button>}
-                  {m.status!=='deleted'&&
-                    <button type="button" onClick={()=>setMemberStatus(m,'deleted')}>Elimina</button>}
+
+                <div className="member-actions" style={{position:'relative'}}>
+                  <button
+                    type="button"
+                    className="member-menu-button"
+                    aria-expanded={openMemberMenu===m.id}
+                    onClick={()=>setOpenMemberMenu(openMemberMenu===m.id?null:m.id)}
+                  >
+                    Azioni <ChevronDown size={15}/>
+                  </button>
+
+                  {openMemberMenu===m.id&&
+                    <div className="member-actions-menu" style={{
+                      position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:20,
+                      minWidth:'170px',padding:'6px',background:'#fff',
+                      border:'1px solid #e1e8e1',borderRadius:'12px',
+                      boxShadow:'0 10px 28px rgba(20,40,30,.14)',
+                      display:'grid',gap:'3px'
+                    }}>
+                      <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);editMember(m);}}>
+                        Modifica dati
+                      </button>
+                      {m.status==='active'&&
+                        <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'suspended');}}>
+                          Sospendi socio
+                        </button>}
+                      {m.status==='suspended'&&
+                        <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'active');}}>
+                          Riattiva socio
+                        </button>}
+                      {m.status!=='deleted'&&
+                        <button type="button" className="menu-danger" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#a33b32'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'deleted');}}>
+                          Disattiva socio
+                        </button>}
+                    </div>}
                 </div>
               </div>)
           }
