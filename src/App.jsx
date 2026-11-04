@@ -52,6 +52,7 @@ function App() {
   const [newAdmin,setNewAdmin] = useState({name:'',surname:'',email:'',password:''});
   const [adminProfiles,setAdminProfiles] = useState([]);
   const [savingAdmin,setSavingAdmin] = useState(false);
+  const [activeView,setActiveView] = useState('bookings');
   const [newBooking,setNewBooking] = useState({court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']});
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -377,8 +378,32 @@ function App() {
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
 
       <nav>
-        <span className="nav-active"><CalendarDays size={18}/> Prenotazioni</span>
-        {isAdmin&&<span><ShieldCheck size={18}/> Gestione soci</span>}
+        <button
+          type="button"
+          className={activeView==='bookings'?'nav-active nav-button':'nav-button'}
+          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='bookings'?undefined:'transparent'}}
+          onClick={()=>setActiveView('bookings')}
+        >
+          <CalendarDays size={18}/> Prenotazioni
+        </button>
+
+        {isAdmin&&<button
+          type="button"
+          className={activeView==='members'?'nav-active nav-button':'nav-button'}
+          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='members'?undefined:'transparent'}}
+          onClick={()=>setActiveView('members')}
+        >
+          <ShieldCheck size={18}/> Gestione soci
+        </button>}
+
+        {isSuperAdmin&&<button
+          type="button"
+          className={activeView==='admins'?'nav-active nav-button':'nav-button'}
+          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='admins'?undefined:'transparent'}}
+          onClick={()=>setActiveView('admins')}
+        >
+          <ShieldCheck size={18}/> Gestione amministratori
+        </button>}
       </nav>
 
       <div className="sidebar-bottom">
@@ -424,97 +449,101 @@ function App() {
         </div>
       </header>
 
-      <section className="welcome-strip">
-        <div><Sparkles size={18}/><span>È il momento di giocare. Scegli il tuo prossimo slot.</span></div>
-        <span>2 CAMPI · 60 MINUTI</span>
-      </section>
+      {activeView==='bookings'&&<>
+        <section className="welcome-strip">
+          <div><Sparkles size={18}/><span>È il momento di giocare. Scegli il tuo prossimo slot.</span></div>
+          <span>2 CAMPI · 60 MINUTI</span>
+        </section>
 
-      <section className="date-section">
-        <div>
-          <span className="eyebrow">CALENDARIO</span>
-          <h2>Le disponibilità</h2>
-        </div>
-
-        <div className="date-tabs">
-          {days.map((d,i)=><button key={i} onClick={()=>setSelectedDate(dateKey(d))} className={selectedDate===dateKey(d)?'date-tab selected':''}>
-            <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
-            <b>{pad(d.getDate())}</b>
-            <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
-          </button>)}
-        </div>
-      </section>
-
-      <div className="booking-toolbar">
-        <div className="selected-date"><CalendarDays size={17}/><b>{prettyDate(selected)}</b></div>
-
-        <div className="filters">
-          <button className={court==='all'?'filter active':''} onClick={()=>setCourt('all')}>Tutti i campi</button>
-          <button className={court==='1'?'filter active':''} onClick={()=>setCourt('1')}>Campo 1</button>
-          <button className={court==='2'?'filter active':''} onClick={()=>setCourt('2')}>Campo 2</button>
-        </div>
-
-        <button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
-          <Plus size={17}/> Nuova prenotazione
-        </button>
-      </div>
-
-      <section className="courts-grid">
-        {[1,2].filter(c=>court==='all'||String(c)===court).map(c=><article className="court-card" key={c}>
-          <div className="court-head">
-            <div>
-              <span className="eyebrow">CAMPO {c===1?'01':'02'}</span>
-              <h3>Campo {c}</h3>
-            </div>
-            <span className="court-status"><i/> Disponibile</span>
+        <section className="date-section">
+          <div>
+            <span className="eyebrow">CALENDARIO</span>
+            <h2>Le disponibilità</h2>
           </div>
 
-          <div className="court-visual">
-            <div className="court-drawing">
-              <div className="court-inner">
-                <div className="court-mid"/>
-                <div className="court-net"/>
+          <div className="date-tabs">
+            {days.map((d,i)=><button key={i} onClick={()=>setSelectedDate(dateKey(d))} className={selectedDate===dateKey(d)?'date-tab selected':''}>
+              <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
+              <b>{pad(d.getDate())}</b>
+              <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
+            </button>)}
+          </div>
+        </section>
+
+        <div className="booking-toolbar">
+          <div className="selected-date"><CalendarDays size={17}/><b>{prettyDate(selected)}</b></div>
+
+          <div className="filters">
+            <button className={court==='all'?'filter active':''} onClick={()=>setCourt('all')}>Tutti i campi</button>
+            <button className={court==='1'?'filter active':''} onClick={()=>setCourt('1')}>Campo 1</button>
+            <button className={court==='2'?'filter active':''} onClick={()=>setCourt('2')}>Campo 2</button>
+          </div>
+
+          <button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
+            <Plus size={17}/> Nuova prenotazione
+          </button>
+        </div>
+
+        <section className="courts-grid">
+          {[1,2].filter(c=>court==='all'||String(c)===court).map(c=><article className="court-card" key={c}>
+            <div className="court-head">
+              <div>
+                <span className="eyebrow">CAMPO {c===1?'01':'02'}</span>
+                <h3>Campo {c}</h3>
               </div>
+              <span className="court-status"><i/> Disponibile</span>
             </div>
-            <span className="court-caption">TENNIS CLUB PABILLONIS</span>
-          </div>
 
-          <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
+            <div className="court-visual">
+              <div className="court-drawing">
+                <div className="court-inner">
+                  <div className="court-mid"/>
+                  <div className="court-net"/>
+                </div>
+              </div>
+              <span className="court-caption">TENNIS CLUB PABILLONIS</span>
+            </div>
 
-          <div className="slots">
-            {hours.map(t=>{
-              const b=bookingAt(c,t);
-              const past=selectedDate===dateKey(new Date())&&t<=`${pad(new Date().getHours())}:00`;
+            <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
 
-              return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}>
-                <span>{t}</span>
+            <div className="slots">
+              {hours.map(t=>{
+                const b=bookingAt(c,t);
+                const past=selectedDate===dateKey(new Date())&&t<=`${pad(new Date().getHours())}:00`;
 
-                {b
-                  ? <div className="slot-info">
-                      <b>{playerNames(b)}</b>
-                      <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
-                    </div>
-                  : <small>{past?'Passato':'Libero'}</small>
-                }
+                return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}>
+                  <span>{t}</span>
 
-                {b&&(isAdmin||(b.booking_players||[]).some(p=>p.member_id===session.user.id))&&
-                  <button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}>
-                    <X size={14}/>
-                  </button>
-                }
-              </div>;
-            })}
-          </div>
-        </article>)}
-      </section>
+                  {b
+                    ? <div className="slot-info">
+                        <b>{playerNames(b)}</b>
+                        <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+                      </div>
+                    : <small>{past?'Passato':'Libero'}</small>
+                  }
 
-      {isAdmin&&<section className="admin-panel">
+                  {b&&(isAdmin||(b.booking_players||[]).some(p=>p.member_id===session.user.id))&&
+                    <button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}>
+                      <X size={14}/>
+                    </button>
+                  }
+                </div>;
+              })}
+            </div>
+          </article>)}
+        </section>
+      </>}
+
+      {activeView==='members'&&isAdmin&&<section className="admin-panel">
         <div className="admin-heading">
           <div>
             <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
-            <h2>Nuovo socio</h2>
+            <h2>Gestione soci</h2>
           </div>
           <ShieldCheck/>
         </div>
+
+        <h3>Nuovo socio</h3>
 
         <form className="member-form" onSubmit={addMember}>
           <input placeholder="Nome" value={newMember.name} onChange={e=>setNewMember({...newMember,name:e.target.value})} required/>
@@ -524,50 +553,66 @@ function App() {
           <button className="primary">Crea account <Plus size={16}/></button>
         </form>
 
-        <p className="muted">La creazione account richiede la funzione amministrativa Supabase inclusa nel progetto.</p>
+        <p className="muted">I soci attivi registrati nel sistema.</p>
 
-        {isSuperAdmin&&<>
-          <div className="admin-heading admin-subheading">
-            <div>
-              <span className="eyebrow">GESTIONE PRIVILEGI</span>
-              <h2>Nuovo amministratore</h2>
-            </div>
-            <ShieldCheck/>
-          </div>
-
-          <form className="member-form" onSubmit={addAdmin}>
-            <input placeholder="Nome" value={newAdmin.name} onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
-            <input placeholder="Cognome" value={newAdmin.surname} onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
-            <input type="email" placeholder="Email" value={newAdmin.email} onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
-            <input type="password" placeholder="Password iniziale" value={newAdmin.password} onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})} minLength="8" required/>
-            <button className="primary" disabled={savingAdmin}>
-              {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
-            </button>
-          </form>
-
-          <div className="admin-heading admin-subheading">
-            <div>
-              <span className="eyebrow">AMMINISTRATORI ATTUALI</span>
-              <h2>Gestione amministratori</h2>
-            </div>
-            <ShieldCheck/>
-          </div>
-
-          {adminProfiles.length===0
-            ? <p className="muted">Non ci sono altri amministratori.</p>
-            : <div className="admin-list">
-                {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
-                  <div>
-                    <b>{a.full_name}</b>
-                    <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
-                  </div>
-                  <button type="button" className="slot-cancel" title="Revoca amministratore" onClick={()=>revokeAdmin(a.id)}>
-                    Revoca
-                  </button>
-                </div>)}
-              </div>
+        <div className="admin-list">
+          {members.length===0
+            ? <p className="muted">Nessun socio attivo presente.</p>
+            : members.map(m=><div className="admin-list-row" key={m.id}>
+                <div>
+                  <b>{m.full_name}</b>
+                  <small>{m.status==='active'?'Attivo':'Non attivo'}</small>
+                </div>
+              </div>)
           }
-        </>}
+        </div>
+      </section>}
+
+      {activeView==='admins'&&isSuperAdmin&&<section className="admin-panel">
+        <div className="admin-heading">
+          <div>
+            <span className="eyebrow">AREA RISERVATA SUPER ADMIN</span>
+            <h2>Gestione amministratori</h2>
+          </div>
+          <ShieldCheck/>
+        </div>
+
+        <h3>Nuovo amministratore</h3>
+
+        <form className="member-form" onSubmit={addAdmin}>
+          <input placeholder="Nome" value={newAdmin.name} onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
+          <input placeholder="Cognome" value={newAdmin.surname} onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
+          <input type="email" placeholder="Email" value={newAdmin.email} onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
+          <input type="password" placeholder="Password iniziale" value={newAdmin.password} onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})} minLength="8" required/>
+
+          <button className="primary" disabled={savingAdmin}>
+            {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
+          </button>
+        </form>
+
+        <div className="admin-heading admin-subheading">
+          <div>
+            <span className="eyebrow">AMMINISTRATORI ATTUALI</span>
+            <h2>Elenco amministratori</h2>
+          </div>
+          <ShieldCheck/>
+        </div>
+
+        {adminProfiles.length===0
+          ? <p className="muted">Non ci sono altri amministratori.</p>
+          : <div className="admin-list">
+              {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
+                <div>
+                  <b>{a.full_name}</b>
+                  <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
+                </div>
+
+                <button type="button" className="slot-cancel" title="Revoca amministratore" onClick={()=>revokeAdmin(a.id)}>
+                  Revoca
+                </button>
+              </div>)}
+            </div>
+        }
       </section>}
 
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
