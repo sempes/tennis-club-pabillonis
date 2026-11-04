@@ -75,25 +75,30 @@ function TennisCourt() {
           fill="url(#tennisSurface)"
         />
 
-        {/* Linee bianche del campo */}
+        {/* Linee regolamentari */}
         <g
           fill="none"
           stroke="#ffffff"
           strokeWidth="3"
         >
-          {/* Perimetro esterno */}
-          <rect x="140" y="48" width="440" height="204"/>
+          {/* Perimetro campo doppio */}
+          <rect
+            x="140"
+            y="48"
+            width="440"
+            height="204"
+          />
 
-          {/* Linee laterali del singolare */}
-          <line x1="140" y1="92" x2="580" y2="92"/>
-          <line x1="140" y1="208" x2="580" y2="208"/>
+          {/* Linee laterali singolare: corsie più strette */}
+          <line x1="140" y1="73.5" x2="580" y2="73.5"/>
+          <line x1="140" y1="226.5" x2="580" y2="226.5"/>
 
           {/* Linee di servizio */}
-          <line x1="250" y1="92" x2="250" y2="208"/>
-          <line x1="470" y1="92" x2="470" y2="208"/>
+          <line x1="242" y1="73.5" x2="242" y2="226.5"/>
+          <line x1="478" y1="73.5" x2="478" y2="226.5"/>
 
           {/* Linea centrale di servizio */}
-          <line x1="250" y1="150" x2="470" y2="150"/>
+          <line x1="242" y1="150" x2="478" y2="150"/>
         </g>
 
         {/* Rete centrale */}
@@ -136,7 +141,6 @@ function TennisCourt() {
     </div>
   );
 }
-
 function App() {
   const [session,setSession] = useState(null);
   const [profile,setProfile] = useState(null);
