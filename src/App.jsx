@@ -614,19 +614,24 @@ function App() {
           {allMembers.length===0
             ? <p className="muted">Nessun socio presente.</p>
             : allMembers.map(m=><div className="admin-list-row" key={m.id}>
-                <div className="member-info">
+                <div className="member-info" style={{
+                  display:'flex',
+                  alignItems:'center',
+                  gap:'12px',
+                  minWidth:0
+                }}>
                   <b>{m.full_name}</b>
                   <small className={`member-status ${
                     m.status==='active'?'status-active':
                     m.status==='suspended'?'status-suspended':'status-deleted'
-                  }`}>
+                  }`} style={{marginLeft:'6px'}}>
                     <i/>
                     {m.status==='active'?'Attivo':
                       m.status==='suspended'?'Sospeso':'Eliminato'}
                   </small>
                 </div>
 
-                <div className="member-actions" style={{position:'relative'}}>
+                <div className="member-actions" style={{position:'relative',marginLeft:'16px'}}>
                   <button
                     type="button"
                     className="member-menu-button"
