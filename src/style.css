@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
@@ -32,23 +31,32 @@ button { cursor: pointer; }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font: 800 25px Manrope;
   letter-spacing: -1.5px;
 }
 
-.brand-mark {
-  width: 37px;
-  height: 37px;
-  border-radius: 12px;
-  background: #d8f36b;
-  color: #183128;
-  display: grid;
-  place-items: center;
+.brand-dot { color: #d8f36b; }
+
+.club-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: white;
+  padding: 2px;
+  flex-shrink: 0;
 }
 
-.brand-mark svg { width: 21px; }
-.brand-dot { color: #d8f36b; }
+.sidebar .club-logo {
+  width: 52px;
+  height: 52px;
+}
+
+.login-art .club-logo {
+  width: 62px;
+  height: 62px;
+}
 
 .club-label {
   margin: 46px 0 34px 4px;
@@ -868,6 +876,22 @@ button { cursor: pointer; }
 
 .mobile-brand { display: none; }
 
+.login-clab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  color: #89958b;
+  font-size: 10px;
+}
+
+.login-clab img {
+  width: 135px;
+  max-height: 55px;
+  object-fit: contain;
+}
+
 .setup-screen {
   min-height: 100vh;
   display: grid;
@@ -931,6 +955,28 @@ button { cursor: pointer; }
   flex: none;
 }
 
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 35px 0 5px;
+  margin-top: 35px;
+  border-top: 1px solid #e2e8df;
+  color: #89958b;
+  font-size: 10px;
+}
+
+.app-footer img {
+  width: 115px;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.setup-card .app-footer {
+  margin-top: 28px;
+}
+
 @media(max-width:1100px) {
   .sidebar { width: 205px; }
 
@@ -960,7 +1006,6 @@ button { cursor: pointer; }
   }
 
   .sidebar .brand { font-size: 20px; }
-  .sidebar .brand-mark { width: 32px; height: 32px; }
 
   .club-label,
   .sidebar nav { display: none; }
@@ -1069,11 +1114,21 @@ button { cursor: pointer; }
   }
 
   .mobile-brand {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 12px;
     font: 700 11px Manrope;
     letter-spacing: 2px;
     color: #819080;
     margin-bottom: 50px;
+  }
+
+  .mobile-brand img {
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
+    border-radius: 50%;
+    background: white;
   }
 
   .mobile-brand b { color: #20392d; }
@@ -1089,4 +1144,19 @@ button { cursor: pointer; }
   .setup-card { padding: 25px; }
 
   .setup-card h1 { font-size: 34px; }
+
+  .sidebar .club-logo {
+    width: 43px;
+    height: 43px;
+  }
+
+  .app-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 25px;
+  }
+
+  .app-footer img {
+    width: 100px;
+  }
 }
