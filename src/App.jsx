@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
@@ -48,9 +49,13 @@ function App() {
   const [confirmPassword,setConfirmPassword] = useState('');
   const [savingPassword,setSavingPassword] = useState(false);
   const [newMember,setNewMember] = useState({name:'',surname:'',email:'',password:''});
+  const [newAdmin,setNewAdmin] = useState({name:'',surname:'',email:'',password:''});
+  const [adminProfiles,setAdminProfiles] = useState([]);
+  const [savingAdmin,setSavingAdmin] = useState(false);
   const [newBooking,setNewBooking] = useState({court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']});
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const isSuperAdmin = profile?.role === 'super_admin';
   const selected = new Date(`${selectedDate}T12:00:00`);
   const days = [0,1,2].map(n=>{const d=new Date();d.setDate(d.getDate()+n);return d;});
 
@@ -67,15 +72,18 @@ function App() {
       setProfile(null);
       setMembers([]);
       setBookings([]);
+      setAdminProfiles([]);
     }
   },[session]);
 
   async function loadData(){
+    if(!session) return;
+
     setLoading(true);
 
     const [{data:p,error:pe},{data:m,error:me},{data:b,error:be}] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',session.user.id).single(),
-      supabase.from('profiles').select('id,full_name,status').order('full_name'),
+      supabase.from('profiles').select('id,full_name,status,role').order('full_name'),
       supabase.from('bookings').select('*,booking_players(*)').gte('booking_date',dateKey(new Date())).order('booking_date').order('start_time')
     ]);
 
@@ -83,9 +91,15 @@ function App() {
     else if(p?.status !== 'active') {
       await supabase.auth.signOut();
       setNotice('Account non attivo. Contatta l’amministratore.');
-    } else setProfile(p);
+    } else {
+      setProfile(p);
+    }
 
-    if(!me) setMembers((m || []).filter(x=>x.status==='active'));
+    if(!me) {
+      setMembers((m || []).filter(x=>x.status==='active' && x.role==='member'));
+      setAdminProfiles((m || []).filter(x=>x.role==='admin'));
+    }
+
     if(be) setNotice(be.message);
     else setBookings(b || []);
 
@@ -225,8 +239,14 @@ function App() {
   async function cancelBooking(id){
     if(!confirm('Vuoi cancellare questa prenotazione?')) return;
 
-    const {error}=await supabase.from('bookings').update({status:'cancelled'}).eq('id',id);
-    setNotice(error?error.message:'Prenotazione cancellata.');
+    const {error}=await supabase.rpc('cancel_booking',{p_booking_id:id});
+
+    if(error){
+      setNotice('Errore durante la cancellazione: '+error.message);
+      return;
+    }
+
+    setNotice('Prenotazione cancellata.');
     await loadData();
   }
 
@@ -259,6 +279,43 @@ function App() {
 
     setNotice('Socio creato correttamente. Le credenziali sono state predisposte.');
     setNewMember({name:'',surname:'',email:'',password:''});
+    await loadData();
+  }
+
+  async function addAdmin(e){
+    e.preventDefault();
+    setNotice('');
+    setSavingAdmin(true);
+
+    const {data,error}=await supabase.functions.invoke('admin-manage-member',{
+      body:{...newAdmin,action:'create_admin'}
+    });
+
+    setSavingAdmin(false);
+
+    if(error || data?.error){
+      setNotice('Errore creazione amministratore: '+(data?.error || error?.message || 'errore sconosciuto'));
+      return;
+    }
+
+    setNotice('Amministratore creato correttamente.');
+    setNewAdmin({name:'',surname:'',email:'',password:''});
+    await loadData();
+  }
+
+  async function revokeAdmin(id){
+    if(!confirm('Vuoi revocare i permessi di questo amministratore? Il suo account diventerà un socio.')) return;
+
+    const {data,error}=await supabase.functions.invoke('admin-manage-member',{
+      body:{action:'revoke_admin',member_id:id}
+    });
+
+    if(error || data?.error){
+      setNotice('Errore revoca amministratore: '+(data?.error || error?.message || 'errore sconosciuto'));
+      return;
+    }
+
+    setNotice('Permessi amministratore revocati.');
     await loadData();
   }
 
@@ -329,7 +386,7 @@ function App() {
           <span className="avatar">{profile?.full_name?.[0]||'S'}</span>
           <div>
             <b>{profile?.full_name}</b>
-            <small>{isAdmin?'Amministratore':'Socio'}</small>
+            <small>{isSuperAdmin?'Super Admin':isAdmin?'Amministratore':'Socio'}</small>
           </div>
         </div>
 
@@ -439,7 +496,7 @@ function App() {
                   : <small>{past?'Passato':'Libero'}</small>
                 }
 
-                {b&&(b.owner_id===session.user.id||isAdmin)&&
+                {b&&(isAdmin||(b.booking_players||[]).some(p=>p.member_id===session.user.id))&&
                   <button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}>
                     <X size={14}/>
                   </button>
@@ -468,6 +525,49 @@ function App() {
         </form>
 
         <p className="muted">La creazione account richiede la funzione amministrativa Supabase inclusa nel progetto.</p>
+
+        {isSuperAdmin&&<>
+          <div className="admin-heading admin-subheading">
+            <div>
+              <span className="eyebrow">GESTIONE PRIVILEGI</span>
+              <h2>Nuovo amministratore</h2>
+            </div>
+            <ShieldCheck/>
+          </div>
+
+          <form className="member-form" onSubmit={addAdmin}>
+            <input placeholder="Nome" value={newAdmin.name} onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
+            <input placeholder="Cognome" value={newAdmin.surname} onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
+            <input type="email" placeholder="Email" value={newAdmin.email} onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
+            <input type="password" placeholder="Password iniziale" value={newAdmin.password} onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})} minLength="8" required/>
+            <button className="primary" disabled={savingAdmin}>
+              {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
+            </button>
+          </form>
+
+          <div className="admin-heading admin-subheading">
+            <div>
+              <span className="eyebrow">AMMINISTRATORI ATTUALI</span>
+              <h2>Gestione amministratori</h2>
+            </div>
+            <ShieldCheck/>
+          </div>
+
+          {adminProfiles.length===0
+            ? <p className="muted">Non ci sono altri amministratori.</p>
+            : <div className="admin-list">
+                {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
+                  <div>
+                    <b>{a.full_name}</b>
+                    <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
+                  </div>
+                  <button type="button" className="slot-cancel" title="Revoca amministratore" onClick={()=>revokeAdmin(a.id)}>
+                    Revoca
+                  </button>
+                </div>)}
+              </div>
+          }
+        </>}
       </section>}
 
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
