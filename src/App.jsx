@@ -29,6 +29,7 @@ function ClabFooter() {
     </footer>
   );
 }
+
 function TennisCourt() {
   return (
     <div className="court-visual">
@@ -60,41 +61,26 @@ function TennisCourt() {
           </filter>
         </defs>
 
-        {/* Fondo blu scuro */}
         <rect width="720" height="300" rx="22" fill="url(#courtOuter)"/>
 
-        {/* Superficie azzurra */}
         <rect x="140" y="48" width="440" height="204"
           fill="url(#courtBlue)" filter="url(#courtShadow)"/>
 
         <rect x="140" y="48" width="440" height="204"
           fill="url(#courtTexture)"/>
 
-        {/* Linee perimetrali */}
         <g fill="none" stroke="#ffffff" strokeWidth="3">
           <rect x="140" y="48" width="440" height="204"/>
-
-          {/* Linee laterali del singolo */}
           <line x1="185" y1="48" x2="185" y2="252"/>
           <line x1="535" y1="48" x2="535" y2="252"/>
-
-          {/* Linee di servizio */}
           <line x1="250" y1="92" x2="470" y2="92"/>
           <line x1="250" y1="208" x2="470" y2="208"/>
-
-          {/* Linea centrale di servizio */}
           <line x1="360" y1="92" x2="360" y2="208"/>
-
-          {/* Rete centrale */}
-          <line x1="360" y1="48" x2="360" y2="252"
-            stroke="#ffffff" strokeWidth="5"/>
-
-          {/* Segni centrali delle linee di fondo */}
+          <line x1="360" y1="48" x2="360" y2="252" strokeWidth="5"/>
           <line x1="140" y1="150" x2="151" y2="150"/>
           <line x1="569" y1="150" x2="580" y2="150"/>
         </g>
 
-        {/* Rete */}
         <g>
           <rect x="356" y="46" width="8" height="208"
             fill="#102c3e" opacity=".85"/>
@@ -106,7 +92,6 @@ function TennisCourt() {
             rx="2" fill="#ffffff"/>
         </g>
 
-        {/* Nome del club */}
         <text x="690" y="280"
           textAnchor="end"
           fill="#ffffff"
@@ -120,6 +105,7 @@ function TennisCourt() {
     </div>
   );
 }
+
 function App() {
   const [session,setSession] = useState(null);
   const [profile,setProfile] = useState(null);
@@ -251,8 +237,7 @@ function App() {
     setShowPassword(false);
     setNotice('Password modificata correttamente.');
   }
-
-  const dayBookings=useMemo(
+    const dayBookings=useMemo(
     ()=>bookings.filter(b=>b.booking_date===selectedDate &&
       (court==='all'||String(b.court_id)===court)),
     [bookings,selectedDate,court]
@@ -387,7 +372,8 @@ function App() {
 
     const email=prompt('Email del socio:',member.email||'');
     if(email===null) return;
-        if(!name.trim()||!surname.trim()||!email.trim()){
+
+    if(!name.trim()||!surname.trim()||!email.trim()){
       setNotice('Nome, cognome ed email sono obbligatori.');
       return;
     }
@@ -482,8 +468,7 @@ function App() {
     setNotice('Permessi amministratore revocati.');
     await loadData();
   }
-
-  if(!configured) return <SetupScreen />;
+    if(!configured) return <SetupScreen />;
 
   if(!session) return <main className="login-shell">
     <div className="login-art">
@@ -634,15 +619,8 @@ function App() {
               <span className="court-status"><i/> Disponibile</span>
             </div>
 
-            <div className="court-visual">
-              <div className="court-drawing">
-                <div className="court-inner">
-                  <div className="court-mid"/>
-                  <div className="court-net"/>
-                </div>
-              </div>
-              <span className="court-caption">TENNIS CLUB PABILLONIS</span>
-            </div>
+            {/* Nuovo campo da tennis azzurro */}
+            <TennisCourt/>
 
             <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
             <div className="slots">
@@ -670,7 +648,8 @@ function App() {
           </article>)}
         </section>
       </>}
-            {activeView==='members'&&isAdmin&&<section className="admin-panel">
+
+      {activeView==='members'&&isAdmin&&<section className="admin-panel">
         <div className="admin-heading">
           <div>
             <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
