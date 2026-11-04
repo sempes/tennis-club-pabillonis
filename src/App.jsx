@@ -1,16 +1,35 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
-  Sparkles, CircleDot, X, KeyRound, LockKeyhole
+  Sparkles, X, KeyRound, LockKeyhole
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
+import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
+import clabLogo from '../logo-clabc-solutions.png';
 
 const pad = n => String(n).padStart(2, '0');
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const prettyDate = d => new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long'}).format(d);
 const hours = Array.from({length:24},(_,i)=>`${pad(i)}:00`);
 const today = new Date();
+
+function Brand() {
+  return (
+    <div className="brand">
+      <img className="club-logo" src={clubLogo} alt="Tennis Club Pabillonis" />
+      <span>TCP<span className="brand-dot">.</span></span>
+    </div>
+  );
+}
+
+function ClabFooter() {
+  return (
+    <footer className="app-footer">
+      <span>Applicazione realizzata da</span>
+      <img src={clabLogo} alt="CLAB.C Solutions" />
+    </footer>
+  );
+}
 
 function App() {
   const [session,setSession] = useState(null);
@@ -247,10 +266,7 @@ function App() {
 
   if(!session) return <main className="login-shell">
     <div className="login-art">
-      <div className="brand">
-        <span className="brand-mark"><CircleDot/></span>
-        <span>TCP<span className="brand-dot">.</span></span>
-      </div>
+      <Brand />
 
       <div className="art-copy">
         <span className="eyebrow">IL TUO CLUB, IL TUO CAMPO</span>
@@ -263,7 +279,10 @@ function App() {
     </div>
 
     <section className="login-panel">
-      <div className="mobile-brand">TENNIS CLUB <b>PABILLONIS</b></div>
+      <div className="mobile-brand">
+        <img src={clubLogo} alt="Tennis Club Pabillonis" />
+        <span>TENNIS CLUB <b>PABILLONIS</b></span>
+      </div>
 
       <div className="login-card">
         <span className="eyebrow">AREA RISERVATA AI SOCI</span>
@@ -287,15 +306,16 @@ function App() {
       </div>
 
       <div className="login-bottom">© Tennis Club Pabillonis <span>•</span> Accesso soci</div>
+      <div className="login-clab">
+        <span>Realizzato da</span>
+        <img src={clabLogo} alt="CLAB.C Solutions" />
+      </div>
     </section>
   </main>;
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-mark"><CircleDot/></span>
-        <span>TCP<span className="brand-dot">.</span></span>
-      </div>
+      <Brand />
 
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
 
@@ -452,6 +472,7 @@ function App() {
 
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
+      <ClabFooter />
     </main>
 
     {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
@@ -575,10 +596,7 @@ function App() {
 function SetupScreen(){
   return <div className="setup-screen">
     <div className="setup-card">
-      <div className="brand">
-        <span className="brand-mark"><CircleDot/></span>
-        <span>TCP<span className="brand-dot">.</span></span>
-      </div>
+      <Brand />
 
       <span className="eyebrow">CONFIGURAZIONE INIZIALE</span>
       <h1>Il club sta per<br/><em>scendere in campo.</em></h1>
@@ -593,6 +611,7 @@ function SetupScreen(){
 
       <div className="setup-warning"><ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.</div>
       <p className="muted">Consulta il file README incluso nel progetto per la procedura completa e le funzioni server necessarie.</p>
+      <ClabFooter />
     </div>
   </div>;
 }
