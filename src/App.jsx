@@ -30,75 +30,108 @@ function ClabFooter() {
   );
 }
 
+/* CAMPO DA TENNIS AZZURRO */
 function TennisCourt() {
   return (
-    <div className="court-visual">
+    <div
+      className="tennis-court-graphic"
+      style={{
+        width: '100%',
+        aspectRatio: '720 / 300',
+        overflow: 'hidden',
+        borderRadius: '18px',
+        lineHeight: 0
+      }}
+    >
       <svg
         viewBox="0 0 720 300"
         width="100%"
+        height="100%"
         role="img"
         aria-label="Campo da tennis azzurro visto dall'alto"
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
       >
         <defs>
-          <linearGradient id="courtOuter" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="tennisOuter" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#07539a"/>
             <stop offset="100%" stopColor="#06366e"/>
           </linearGradient>
 
-          <linearGradient id="courtBlue" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="tennisSurface" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#159de8"/>
             <stop offset="100%" stopColor="#0878c5"/>
           </linearGradient>
-
-          <pattern id="courtTexture" width="8" height="8" patternUnits="userSpaceOnUse">
-            <path d="M0 8 L8 0" stroke="#ffffff" strokeOpacity=".035" strokeWidth="1"/>
-          </pattern>
-
-          <filter id="courtShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="5" stdDeviation="5"
-              floodColor="#001d38" floodOpacity=".3"/>
-          </filter>
         </defs>
 
-        <rect width="720" height="300" rx="22" fill="url(#courtOuter)"/>
+        <rect width="720" height="300" fill="url(#tennisOuter)"/>
 
-        <rect x="140" y="48" width="440" height="204"
-          fill="url(#courtBlue)" filter="url(#courtShadow)"/>
+        <rect
+          x="140"
+          y="48"
+          width="440"
+          height="204"
+          fill="url(#tennisSurface)"
+        />
 
-        <rect x="140" y="48" width="440" height="204"
-          fill="url(#courtTexture)"/>
-
-        <g fill="none" stroke="#ffffff" strokeWidth="3">
+        <g
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="3"
+          strokeLinecap="square"
+        >
+          {/* Perimetro del campo */}
           <rect x="140" y="48" width="440" height="204"/>
+
+          {/* Linee laterali del singolare */}
           <line x1="185" y1="48" x2="185" y2="252"/>
           <line x1="535" y1="48" x2="535" y2="252"/>
+
+          {/* Linee di servizio */}
           <line x1="250" y1="92" x2="470" y2="92"/>
           <line x1="250" y1="208" x2="470" y2="208"/>
+
+          {/* Linea centrale di servizio */}
           <line x1="360" y1="92" x2="360" y2="208"/>
-          <line x1="360" y1="48" x2="360" y2="252" strokeWidth="5"/>
+
+          {/* Segni centrali sulle linee di fondo */}
           <line x1="140" y1="150" x2="151" y2="150"/>
           <line x1="569" y1="150" x2="580" y2="150"/>
         </g>
 
-        <g>
-          <rect x="356" y="46" width="8" height="208"
-            fill="#102c3e" opacity=".85"/>
-          <path d="M356 52 V248" stroke="#ffffff"
-            strokeOpacity=".45" strokeWidth="1"/>
-          <rect x="352" y="43" width="16" height="5"
-            rx="2" fill="#ffffff"/>
-          <rect x="352" y="252" width="16" height="5"
-            rx="2" fill="#ffffff"/>
-        </g>
+        {/* Rete centrale */}
+        <rect
+          x="355"
+          y="45"
+          width="10"
+          height="210"
+          rx="2"
+          fill="#18374c"
+        />
 
-        <text x="690" y="280"
+        <line
+          x1="360"
+          y1="48"
+          x2="360"
+          y2="252"
+          stroke="#ffffff"
+          strokeWidth="1"
+          opacity=".7"
+        />
+
+        {/* Pali della rete */}
+        <rect x="352" y="43" width="16" height="5" rx="2" fill="#ffffff"/>
+        <rect x="352" y="252" width="16" height="5" rx="2" fill="#ffffff"/>
+
+        {/* Nome del club */}
+        <text
+          x="690"
+          y="280"
           textAnchor="end"
           fill="#ffffff"
           fontSize="11"
           letterSpacing="3"
           fontWeight="500"
-          opacity=".9">
+        >
           TENNIS CLUB PABILLONIS
         </text>
       </svg>
@@ -237,7 +270,8 @@ function App() {
     setShowPassword(false);
     setNotice('Password modificata correttamente.');
   }
-    const dayBookings=useMemo(
+
+  const dayBookings=useMemo(
     ()=>bookings.filter(b=>b.booking_date===selectedDate &&
       (court==='all'||String(b.court_id)===court)),
     [bookings,selectedDate,court]
@@ -468,7 +502,8 @@ function App() {
     setNotice('Permessi amministratore revocati.');
     await loadData();
   }
-    if(!configured) return <SetupScreen />;
+
+  if(!configured) return <SetupScreen />;
 
   if(!session) return <main className="login-shell">
     <div className="login-art">
@@ -619,7 +654,6 @@ function App() {
               <span className="court-status"><i/> Disponibile</span>
             </div>
 
-            {/* Nuovo campo da tennis azzurro */}
             <TennisCourt/>
 
             <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
