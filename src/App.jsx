@@ -81,7 +81,8 @@ function App() {
   }
 
   async function logout(){
-    await supabase.auth.signOut();
+    const {error}=await supabase.auth.signOut();
+    if(error) setNotice('Errore durante l’uscita: '+error.message);
   }
 
   async function changePassword(e){
@@ -325,9 +326,23 @@ function App() {
 
         <div className="top-actions">
           <span className="live-dot">Sistema attivo</span>
-          <button type="button" className="logout" onClick={()=>{setNotice('');setShowPassword(true);}}>
+
+          <button
+            type="button"
+            className="password-button"
+            onClick={()=>{setNotice('');setShowPassword(true);}}
+          >
             <KeyRound size={17}/> Cambia password
           </button>
+
+          <button
+            type="button"
+            className="exit-button"
+            onClick={logout}
+          >
+            <LogOut size={17}/> Esci
+          </button>
+
           <span className="avatar large">{profile?.full_name?.[0]||'S'}</span>
         </div>
       </header>
