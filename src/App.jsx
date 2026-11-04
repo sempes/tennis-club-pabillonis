@@ -12,7 +12,6 @@ const pad = n => String(n).padStart(2, '0');
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const prettyDate = d => new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long'}).format(d);
 const hours = Array.from({length:24},(_,i)=>`${pad(i)}:00`);
-const today = new Date();
 
 function Brand() {
   return (
@@ -36,8 +35,10 @@ function App() {
   const [session,setSession] = useState(null);
   const [profile,setProfile] = useState(null);
   const [members,setMembers] = useState([]);
+  const [allMembers,setAllMembers] = useState([]);
+  const [adminProfiles,setAdminProfiles] = useState([]);
   const [bookings,setBookings] = useState([]);
-  const [selectedDate,setSelectedDate] = useState(dateKey(today));
+  const [selectedDate,setSelectedDate] = useState(dateKey(new Date()));
   const [court,setCourt] = useState('all');
   const [loading,setLoading] = useState(false);
   const [notice,setNotice] = useState('');
@@ -50,15 +51,20 @@ function App() {
   const [savingPassword,setSavingPassword] = useState(false);
   const [newMember,setNewMember] = useState({name:'',surname:'',email:'',password:''});
   const [newAdmin,setNewAdmin] = useState({name:'',surname:'',email:'',password:''});
-  const [adminProfiles,setAdminProfiles] = useState([]);
   const [savingAdmin,setSavingAdmin] = useState(false);
   const [activeView,setActiveView] = useState('bookings');
-  const [newBooking,setNewBooking] = useState({court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']});
+  const [newBooking,setNewBooking] = useState({
+    court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']
+  });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isSuperAdmin = profile?.role === 'super_admin';
   const selected = new Date(`${selectedDate}T12:00:00`);
-  const days = [0,1,2].map(n=>{const d=new Date();d.setDate(d.getDate()+n);return d;});
+  const days = [0,1,2].map(n=>{
+    const d=new Date();
+    d.setDate(d.getDate()+n);
+    return d;
+  });
 
   useEffect(()=>{
     if(!configured) return;
@@ -72,6 +78,7 @@ function App() {
     else {
       setProfile(null);
       setMembers([]);
+      setAllMembers([]);
       setBookings([]);
       setAdminProfiles([]);
     }
@@ -79,13 +86,14 @@ function App() {
 
   async function loadData(){
     if(!session) return;
-
     setLoading(true);
 
     const [{data:p,error:pe},{data:m,error:me},{data:b,error:be}] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',session.user.id).single(),
-      supabase.from('profiles').select('id,full_name,status,role').order('full_name'),
-      supabase.from('bookings').select('*,booking_players(*)').gte('booking_date',dateKey(new Date())).order('booking_date').order('start_time')
+      supabase.from('profiles').select('id,full_name,email,status,role').order('full_name'),
+      supabase.from('bookings').select('*,booking_players(*)')
+        .gte('booking_date',dateKey(new Date()))
+        .order('booking_date').order('start_time')
     ]);
 
     if(pe) setNotice(pe.message);
@@ -97,12 +105,16 @@ function App() {
     }
 
     if(!me) {
-      setMembers((m || []).filter(x=>x.status==='active' && x.role==='member'));
-      setAdminProfiles((m || []).filter(x=>x.role==='admin'));
+      const memberList=(m||[]).filter(x=>x.role==='member');
+      setAllMembers(memberList);
+      setMembers(memberList.filter(x=>x.status==='active'));
+      setAdminProfiles((m||[]).filter(x=>x.role==='admin'));
+    } else {
+      setNotice('Errore caricamento soci: '+me.message);
     }
 
     if(be) setNotice(be.message);
-    else setBookings(b || []);
+    else setBookings(b||[]);
 
     setLoading(false);
   }
@@ -110,7 +122,9 @@ function App() {
   async function login(e){
     e.preventDefault();
     setNotice('');
-    const {error}=await supabase.auth.signInWithPassword({email:loginEmail,password:loginPassword});
+    const {error}=await supabase.auth.signInWithPassword({
+      email:loginEmail,password:loginPassword
+    });
     if(error) setNotice('Accesso non riuscito: verifica email e password.');
   }
 
@@ -123,22 +137,18 @@ function App() {
     e.preventDefault();
     setNotice('');
 
-    if(newPassword.length < 8){
+    if(newPassword.length<8){
       setNotice('La password deve contenere almeno 8 caratteri.');
       return;
     }
 
-    if(newPassword !== confirmPassword){
+    if(newPassword!==confirmPassword){
       setNotice('Le due password non coincidono.');
       return;
     }
 
     setSavingPassword(true);
-
-    const {error}=await supabase.auth.updateUser({
-      password:newPassword
-    });
-
+    const {error}=await supabase.auth.updateUser({password:newPassword});
     setSavingPassword(false);
 
     if(error){
@@ -153,17 +163,23 @@ function App() {
   }
 
   const dayBookings=useMemo(
-    ()=>bookings.filter(b=>b.booking_date===selectedDate && (court==='all'||String(b.court_id)===court)),
+    ()=>bookings.filter(b=>b.booking_date===selectedDate &&
+      (court==='all'||String(b.court_id)===court)),
     [bookings,selectedDate,court]
   );
 
   const busyMemberIds=useMemo(
-    ()=>new Set(bookings.filter(b=>b.status==='active').flatMap(b=>(b.booking_players||[]).map(p=>p.member_id).filter(Boolean))),
+    ()=>new Set(bookings.filter(b=>b.status==='active')
+      .flatMap(b=>(b.booking_players||[]).map(p=>p.member_id).filter(Boolean))),
     [bookings]
   );
 
   function bookingAt(c,t){
-    return dayBookings.find(b=>String(b.court_id)===String(c)&&b.start_time.slice(0,5)===t&&b.status==='active');
+    return dayBookings.find(b=>
+      String(b.court_id)===String(c) &&
+      b.start_time.slice(0,5)===t &&
+      b.status==='active'
+    );
   }
 
   function playerNames(b){
@@ -179,9 +195,9 @@ function App() {
 
     const count=newBooking.type==='singles'?2:4;
     const picked=newBooking.players.slice(0,count);
-    const guestAllowed = newBooking.type === 'singles' ? [1] : [2,3];
+    const guestAllowed=newBooking.type==='singles'?[1]:[2,3];
 
-    if(picked.some((x,i)=>x==='guest' && !guestAllowed.includes(i))){
+    if(picked.some((x,i)=>x==='guest'&&!guestAllowed.includes(i))){
       setNotice('Un ospite esterno non può occupare questa posizione.');
       return;
     }
@@ -213,7 +229,7 @@ function App() {
       return;
     }
 
-    const {data,error}=await supabase.rpc('create_booking',{
+    const {error}=await supabase.rpc('create_booking',{
       p_court_id:Number(newBooking.court_id),
       p_booking_date:selectedDate,
       p_start_time:newBooking.time,
@@ -240,7 +256,9 @@ function App() {
   async function cancelBooking(id){
     if(!confirm('Vuoi cancellare questa prenotazione?')) return;
 
-    const {error}=await supabase.rpc('cancel_booking',{p_booking_id:id});
+    const {error}=await supabase.rpc('cancel_booking',{
+      p_booking_id:id
+    });
 
     if(error){
       setNotice('Errore durante la cancellazione: '+error.message);
@@ -259,27 +277,83 @@ function App() {
       body:newMember
     });
 
-    if(error){
-      let detail=error.message;
-
-      try{
-        if(error.context && typeof error.context.json==='function'){
-          const response=await error.context.json();
-          detail=response.error || response.message || detail;
-        }
-      }catch{}
-
-      setNotice('Errore creazione socio: '+detail);
+    if(error||data?.error){
+      setNotice('Errore creazione socio: '+(data?.error||error?.message));
       return;
     }
 
-    if(data?.error){
-      setNotice('Errore creazione socio: '+data.error);
-      return;
-    }
-
-    setNotice('Socio creato correttamente. Le credenziali sono state predisposte.');
+    setNotice('Socio creato correttamente.');
     setNewMember({name:'',surname:'',email:'',password:''});
+    await loadData();
+  }
+
+  async function editMember(member){
+    const parts=String(member.full_name||'').split(' ');
+    const name=prompt('Nome del socio:',parts.shift()||'');
+    if(name===null) return;
+
+    const surname=prompt('Cognome del socio:',parts.join(' '));
+    if(surname===null) return;
+
+    const email=prompt('Email del socio:',member.email||'');
+    if(email===null) return;
+
+    if(!name.trim()||!surname.trim()||!email.trim()){
+      setNotice('Nome, cognome ed email sono obbligatori.');
+      return;
+    }
+
+    const {data,error}=await supabase.functions.invoke('admin-manage-member',{
+      body:{
+        action:'update_member',
+        member_id:member.id,
+        name:name.trim(),
+        surname:surname.trim(),
+        email:email.trim()
+      }
+    });
+
+    if(error||data?.error){
+      setNotice('Errore modifica socio: '+(data?.error||error?.message));
+      return;
+    }
+
+    setNotice('Dati del socio aggiornati correttamente.');
+    await loadData();
+  }
+
+  async function setMemberStatus(member,status){
+    const actionText=status==='suspended'
+      ? 'sospendere'
+      : status==='active'
+        ? 'riattivare'
+        : 'eliminare';
+
+    const warning=status==='deleted'
+      ? 'Il socio non potrà più accedere. Lo storico delle prenotazioni sarà conservato. Vuoi continuare?'
+      : `Vuoi ${actionText} ${member.full_name}?`;
+
+    if(!confirm(warning)) return;
+
+    const {data,error}=await supabase.functions.invoke('admin-manage-member',{
+      body:{
+        action:'update_member',
+        member_id:member.id,
+        status
+      }
+    });
+
+    if(error||data?.error){
+      setNotice('Errore durante l’operazione: '+(data?.error||error?.message));
+      return;
+    }
+
+    setNotice(status==='deleted'
+      ? 'Accesso del socio disattivato. Storico conservato.'
+      : status==='suspended'
+        ? 'Socio sospeso correttamente.'
+        : 'Socio riattivato correttamente.');
+
     await loadData();
   }
 
@@ -294,8 +368,8 @@ function App() {
 
     setSavingAdmin(false);
 
-    if(error || data?.error){
-      setNotice('Errore creazione amministratore: '+(data?.error || error?.message || 'errore sconosciuto'));
+    if(error||data?.error){
+      setNotice('Errore creazione amministratore: '+(data?.error||error?.message));
       return;
     }
 
@@ -305,14 +379,14 @@ function App() {
   }
 
   async function revokeAdmin(id){
-    if(!confirm('Vuoi revocare i permessi di questo amministratore? Il suo account diventerà un socio.')) return;
+    if(!confirm('Vuoi revocare i permessi di questo amministratore? Diventerà socio.')) return;
 
     const {data,error}=await supabase.functions.invoke('admin-manage-member',{
       body:{action:'revoke_admin',member_id:id}
     });
 
-    if(error || data?.error){
-      setNotice('Errore revoca amministratore: '+(data?.error || error?.message || 'errore sconosciuto'));
+    if(error||data?.error){
+      setNotice('Errore revoca amministratore: '+(data?.error||error?.message));
       return;
     }
 
@@ -324,21 +398,19 @@ function App() {
 
   if(!session) return <main className="login-shell">
     <div className="login-art">
-      <Brand />
-
+      <Brand/>
       <div className="art-copy">
         <span className="eyebrow">IL TUO CLUB, IL TUO CAMPO</span>
         <h1>Il prossimo<br/><em>match</em> inizia qui.</h1>
         <p>Prenota il campo, scegli i compagni e scendi in gioco.</p>
       </div>
-
       <div className="court-lines"><i/><i/><i/><i/></div>
       <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
     </div>
 
     <section className="login-panel">
       <div className="mobile-brand">
-        <img src={clubLogo} alt="Tennis Club Pabillonis" />
+        <img src={clubLogo} alt="Tennis Club Pabillonis"/>
         <span>TENNIS CLUB <b>PABILLONIS</b></span>
       </div>
 
@@ -349,13 +421,15 @@ function App() {
 
         <form onSubmit={login}>
           <label>Email
-            <input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="nome@email.it" required/>
+            <input type="email" value={loginEmail}
+              onChange={e=>setLoginEmail(e.target.value)}
+              placeholder="nome@email.it" required/>
           </label>
-
           <label>Password
-            <input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="La tua password" required/>
+            <input type="password" value={loginPassword}
+              onChange={e=>setLoginPassword(e.target.value)}
+              placeholder="La tua password" required/>
           </label>
-
           <button className="primary wide">Accedi <ArrowRight size={17}/></button>
         </form>
 
@@ -366,42 +440,32 @@ function App() {
       <div className="login-bottom">© Tennis Club Pabillonis <span>•</span> Accesso soci</div>
       <div className="login-clab">
         <span>Realizzato da</span>
-        <img src={clabLogo} alt="CLAB.C Solutions" />
+        <img src={clabLogo} alt="CLAB.C Solutions"/>
       </div>
     </section>
   </main>;
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <Brand />
-
+      <Brand/>
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
 
       <nav>
-        <button
-          type="button"
+        <button type="button"
           className={activeView==='bookings'?'nav-active nav-button':'nav-button'}
-          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='bookings'?undefined:'transparent'}}
-          onClick={()=>setActiveView('bookings')}
-        >
+          onClick={()=>setActiveView('bookings')}>
           <CalendarDays size={18}/> Prenotazioni
         </button>
 
-        {isAdmin&&<button
-          type="button"
+        {isAdmin&&<button type="button"
           className={activeView==='members'?'nav-active nav-button':'nav-button'}
-          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='members'?undefined:'transparent'}}
-          onClick={()=>setActiveView('members')}
-        >
+          onClick={()=>setActiveView('members')}>
           <ShieldCheck size={18}/> Gestione soci
         </button>}
 
-        {isSuperAdmin&&<button
-          type="button"
+        {isSuperAdmin&&<button type="button"
           className={activeView==='admins'?'nav-active nav-button':'nav-button'}
-          style={{display:'flex',alignItems:'center',gap:'12px',width:'100%',border:0,textAlign:'left',cursor:'pointer',font:'inherit',padding:'16px 20px',background:activeView==='admins'?undefined:'transparent'}}
-          onClick={()=>setActiveView('admins')}
-        >
+          onClick={()=>setActiveView('admins')}>
           <ShieldCheck size={18}/> Gestione amministratori
         </button>}
       </nav>
@@ -414,7 +478,6 @@ function App() {
             <small>{isSuperAdmin?'Super Admin':isAdmin?'Amministratore':'Socio'}</small>
           </div>
         </div>
-
         <button className="logout" onClick={logout}><LogOut size={17}/> Esci</button>
       </div>
     </aside>
@@ -425,26 +488,15 @@ function App() {
           <span className="eyebrow">AREA SOCI / PRENOTAZIONI</span>
           <h1>Il campo ti aspetta<span>.</span></h1>
         </div>
-
         <div className="top-actions">
           <span className="live-dot">Sistema attivo</span>
-
-          <button
-            type="button"
-            className="password-button"
-            onClick={()=>{setNotice('');setShowPassword(true);}}
-          >
+          <button type="button" className="password-button"
+            onClick={()=>{setNotice('');setShowPassword(true);}}>
             <KeyRound size={17}/> Cambia password
           </button>
-
-          <button
-            type="button"
-            className="exit-button"
-            onClick={logout}
-          >
+          <button type="button" className="exit-button" onClick={logout}>
             <LogOut size={17}/> Esci
           </button>
-
           <span className="avatar large">{profile?.full_name?.[0]||'S'}</span>
         </div>
       </header>
@@ -460,9 +512,10 @@ function App() {
             <span className="eyebrow">CALENDARIO</span>
             <h2>Le disponibilità</h2>
           </div>
-
           <div className="date-tabs">
-            {days.map((d,i)=><button key={i} onClick={()=>setSelectedDate(dateKey(d))} className={selectedDate===dateKey(d)?'date-tab selected':''}>
+            {days.map((d,i)=><button key={i}
+              onClick={()=>setSelectedDate(dateKey(d))}
+              className={selectedDate===dateKey(d)?'date-tab selected':''}>
               <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
               <b>{pad(d.getDate())}</b>
               <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
@@ -472,13 +525,11 @@ function App() {
 
         <div className="booking-toolbar">
           <div className="selected-date"><CalendarDays size={17}/><b>{prettyDate(selected)}</b></div>
-
           <div className="filters">
             <button className={court==='all'?'filter active':''} onClick={()=>setCourt('all')}>Tutti i campi</button>
             <button className={court==='1'?'filter active':''} onClick={()=>setCourt('1')}>Campo 1</button>
             <button className={court==='2'?'filter active':''} onClick={()=>setCourt('2')}>Campo 2</button>
           </div>
-
           <button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
             <Plus size={17}/> Nuova prenotazione
           </button>
@@ -505,7 +556,6 @@ function App() {
             </div>
 
             <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
-
             <div className="slots">
               {hours.map(t=>{
                 const b=bookingAt(c,t);
@@ -513,7 +563,6 @@ function App() {
 
                 return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}>
                   <span>{t}</span>
-
                   {b
                     ? <div className="slot-info">
                         <b>{playerNames(b)}</b>
@@ -521,7 +570,6 @@ function App() {
                       </div>
                     : <small>{past?'Passato':'Libero'}</small>
                   }
-
                   {b&&(isAdmin||(b.booking_players||[]).some(p=>p.member_id===session.user.id))&&
                     <button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}>
                       <X size={14}/>
@@ -544,24 +592,44 @@ function App() {
         </div>
 
         <h3>Nuovo socio</h3>
-
         <form className="member-form" onSubmit={addMember}>
-          <input placeholder="Nome" value={newMember.name} onChange={e=>setNewMember({...newMember,name:e.target.value})} required/>
-          <input placeholder="Cognome" value={newMember.surname} onChange={e=>setNewMember({...newMember,surname:e.target.value})} required/>
-          <input type="email" placeholder="Email" value={newMember.email} onChange={e=>setNewMember({...newMember,email:e.target.value})} required/>
-          <input type="password" placeholder="Password iniziale" value={newMember.password} onChange={e=>setNewMember({...newMember,password:e.target.value})} minLength="8" required/>
+          <input placeholder="Nome" value={newMember.name}
+            onChange={e=>setNewMember({...newMember,name:e.target.value})} required/>
+          <input placeholder="Cognome" value={newMember.surname}
+            onChange={e=>setNewMember({...newMember,surname:e.target.value})} required/>
+          <input type="email" placeholder="Email" value={newMember.email}
+            onChange={e=>setNewMember({...newMember,email:e.target.value})} required/>
+          <input type="password" placeholder="Password iniziale" value={newMember.password}
+            onChange={e=>setNewMember({...newMember,password:e.target.value})}
+            minLength="8" required/>
           <button className="primary">Crea account <Plus size={16}/></button>
         </form>
 
-        <p className="muted">I soci attivi registrati nel sistema.</p>
+        <div className="admin-heading admin-subheading">
+          <div>
+            <span className="eyebrow">ELENCO SOCI</span>
+            <h2>Soci registrati</h2>
+          </div>
+        </div>
 
         <div className="admin-list">
-          {members.length===0
-            ? <p className="muted">Nessun socio attivo presente.</p>
-            : members.map(m=><div className="admin-list-row" key={m.id}>
+          {allMembers.length===0
+            ? <p className="muted">Nessun socio presente.</p>
+            : allMembers.map(m=><div className="admin-list-row" key={m.id}>
                 <div>
                   <b>{m.full_name}</b>
-                  <small>{m.status==='active'?'Attivo':'Non attivo'}</small>
+                  <small>
+                    {m.status==='active'?'Attivo':m.status==='suspended'?'Sospeso':'Eliminato'}
+                  </small>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:'8px',alignItems:'center'}}>
+                  <button type="button" onClick={()=>editMember(m)}>Modifica</button>
+                  {m.status==='active'&&
+                    <button type="button" onClick={()=>setMemberStatus(m,'suspended')}>Sospendi</button>}
+                  {m.status==='suspended'&&
+                    <button type="button" onClick={()=>setMemberStatus(m,'active')}>Riattiva</button>}
+                  {m.status!=='deleted'&&
+                    <button type="button" onClick={()=>setMemberStatus(m,'deleted')}>Elimina</button>}
                 </div>
               </div>)
           }
@@ -578,13 +646,16 @@ function App() {
         </div>
 
         <h3>Nuovo amministratore</h3>
-
         <form className="member-form" onSubmit={addAdmin}>
-          <input placeholder="Nome" value={newAdmin.name} onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
-          <input placeholder="Cognome" value={newAdmin.surname} onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
-          <input type="email" placeholder="Email" value={newAdmin.email} onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
-          <input type="password" placeholder="Password iniziale" value={newAdmin.password} onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})} minLength="8" required/>
-
+          <input placeholder="Nome" value={newAdmin.name}
+            onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
+          <input placeholder="Cognome" value={newAdmin.surname}
+            onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
+          <input type="email" placeholder="Email" value={newAdmin.email}
+            onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
+          <input type="password" placeholder="Password iniziale" value={newAdmin.password}
+            onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})}
+            minLength="8" required/>
           <button className="primary" disabled={savingAdmin}>
             {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
           </button>
@@ -595,7 +666,6 @@ function App() {
             <span className="eyebrow">AMMINISTRATORI ATTUALI</span>
             <h2>Elenco amministratori</h2>
           </div>
-          <ShieldCheck/>
         </div>
 
         {adminProfiles.length===0
@@ -606,10 +676,7 @@ function App() {
                   <b>{a.full_name}</b>
                   <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
                 </div>
-
-                <button type="button" className="slot-cancel" title="Revoca amministratore" onClick={()=>revokeAdmin(a.id)}>
-                  Revoca
-                </button>
+                <button type="button" onClick={()=>revokeAdmin(a.id)}>Revoca</button>
               </div>)}
             </div>
         }
@@ -617,7 +684,7 @@ function App() {
 
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
-      <ClabFooter />
+      <ClabFooter/>
     </main>
 
     {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
@@ -632,33 +699,20 @@ function App() {
 
         <form onSubmit={changePassword}>
           <label>Nuova password
-            <input
-              type="password"
-              value={newPassword}
+            <input type="password" value={newPassword}
               onChange={e=>setNewPassword(e.target.value)}
-              placeholder="Almeno 8 caratteri"
-              minLength="8"
-              autoComplete="new-password"
-              required
-            />
+              placeholder="Almeno 8 caratteri" minLength="8"
+              autoComplete="new-password" required/>
           </label>
-
           <label>Conferma nuova password
-            <input
-              type="password"
-              value={confirmPassword}
+            <input type="password" value={confirmPassword}
               onChange={e=>setConfirmPassword(e.target.value)}
-              placeholder="Ripeti la nuova password"
-              minLength="8"
-              autoComplete="new-password"
-              required
-            />
+              placeholder="Ripeti la nuova password" minLength="8"
+              autoComplete="new-password" required/>
           </label>
-
           <div className="modal-note">
             <LockKeyhole size={16}/> La password sarà aggiornata sul tuo account personale.
           </div>
-
           <button className="primary wide" type="submit" disabled={savingPassword}>
             {savingPassword?'Aggiornamento…':'Salva nuova password'}
             <ArrowRight size={17}/>
@@ -679,20 +733,25 @@ function App() {
 
         <form onSubmit={createBooking}>
           <label>Campo
-            <select value={newBooking.court_id} onChange={e=>setNewBooking({...newBooking,court_id:e.target.value})}>
+            <select value={newBooking.court_id}
+              onChange={e=>setNewBooking({...newBooking,court_id:e.target.value})}>
               <option value="1">Campo 1</option>
               <option value="2">Campo 2</option>
             </select>
           </label>
 
           <label>Orario
-            <select value={newBooking.time} onChange={e=>setNewBooking({...newBooking,time:e.target.value})}>
-              {hours.map(h=><option key={h} value={h}>{h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}</option>)}
+            <select value={newBooking.time}
+              onChange={e=>setNewBooking({...newBooking,time:e.target.value})}>
+              {hours.map(h=><option key={h} value={h}>
+                {h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}
+              </option>)}
             </select>
           </label>
 
           <label>Tipo di partita
-            <select value={newBooking.type} onChange={e=>setNewBooking({...newBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
+            <select value={newBooking.type}
+              onChange={e=>setNewBooking({...newBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
               <option value="singles">Singolo · 2 giocatori</option>
               <option value="doubles">Doppio · 4 giocatori</option>
             </select>
@@ -700,13 +759,10 @@ function App() {
 
           <div className="player-fields">
             <b>Giocatori</b>
-
             {Array.from({length:newBooking.type==='singles'?2:4},(_,i)=>{
-              const guestAllowed = newBooking.type==='singles' ? i===1 : i>=2;
-
+              const guestAllowed=newBooking.type==='singles'?i===1:i>=2;
               return <div className="player-row" key={i}>
                 <span>{i+1}</span>
-
                 <select value={newBooking.players[i]||''} onChange={e=>{
                   const a=[...newBooking.players];
                   a[i]=e.target.value;
@@ -716,22 +772,28 @@ function App() {
                 }}>
                   <option value="">Scegli socio{guestAllowed?' oppure ospite':''}</option>
                   {guestAllowed&&<option value="guest">Ospite esterno</option>}
-                  {members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id).map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+                  {members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id)
+                    .map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
                 </select>
-
                 {newBooking.players[i]==='guest'&&guestAllowed&&
-                  <input placeholder="Nome e cognome ospite" value={newBooking.guests[i]||''} onChange={e=>{
-                    const a=[...newBooking.guests];
-                    a[i]=e.target.value;
-                    setNewBooking({...newBooking,guests:a});
-                  }} required/>
+                  <input placeholder="Nome e cognome ospite"
+                    value={newBooking.guests[i]||''}
+                    onChange={e=>{
+                      const a=[...newBooking.guests];
+                      a[i]=e.target.value;
+                      setNewBooking({...newBooking,guests:a});
+                    }} required/>
                 }
               </div>;
             })}
           </div>
 
-          <div className="modal-note"><Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo</div>
-          <button className="primary wide" type="submit">Conferma prenotazione <ArrowRight size={17}/></button>
+          <div className="modal-note">
+            <Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo
+          </div>
+          <button className="primary wide" type="submit">
+            Conferma prenotazione <ArrowRight size={17}/>
+          </button>
         </form>
       </div>
     </div>}
@@ -741,22 +803,21 @@ function App() {
 function SetupScreen(){
   return <div className="setup-screen">
     <div className="setup-card">
-      <Brand />
-
+      <Brand/>
       <span className="eyebrow">CONFIGURAZIONE INIZIALE</span>
       <h1>Il club sta per<br/><em>scendere in campo.</em></h1>
       <p>La parte grafica è pronta. Per attivare accessi e prenotazioni condivise occorre collegare il progetto al database Supabase gratuito.</p>
-
       <ol>
         <li>Crea un progetto su Supabase.</li>
         <li>Esegui lo script <code>supabase/schema.sql</code> nel SQL Editor.</li>
         <li>Copia URL e chiave anonima nel file <code>.env</code>.</li>
         <li>Crea il primo utente amministratore e imposta il suo profilo come <code>admin</code>.</li>
       </ol>
-
-      <div className="setup-warning"><ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.</div>
+      <div className="setup-warning">
+        <ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.
+      </div>
       <p className="muted">Consulta il file README incluso nel progetto per la procedura completa e le funzioni server necessarie.</p>
-      <ClabFooter />
+      <ClabFooter/>
     </div>
   </div>;
 }
