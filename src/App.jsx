@@ -1,7 +1,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck, Sparkles, CircleDot, X
+  ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
+  Sparkles, CircleDot, X, KeyRound, LockKeyhole
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 
@@ -23,6 +24,10 @@ function App() {
   const [loginEmail,setLoginEmail] = useState('');
   const [loginPassword,setLoginPassword] = useState('');
   const [showBooking,setShowBooking] = useState(false);
+  const [showPassword,setShowPassword] = useState(false);
+  const [newPassword,setNewPassword] = useState('');
+  const [confirmPassword,setConfirmPassword] = useState('');
+  const [savingPassword,setSavingPassword] = useState(false);
   const [newMember,setNewMember] = useState({name:'',surname:'',email:'',password:''});
   const [newBooking,setNewBooking] = useState({court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']});
 
@@ -39,7 +44,11 @@ function App() {
 
   useEffect(()=>{
     if(session) loadData();
-    else {setProfile(null);setMembers([]);setBookings([]);}
+    else {
+      setProfile(null);
+      setMembers([]);
+      setBookings([]);
+    }
   },[session]);
 
   async function loadData(){
@@ -73,6 +82,39 @@ function App() {
 
   async function logout(){
     await supabase.auth.signOut();
+  }
+
+  async function changePassword(e){
+    e.preventDefault();
+    setNotice('');
+
+    if(newPassword.length < 8){
+      setNotice('La password deve contenere almeno 8 caratteri.');
+      return;
+    }
+
+    if(newPassword !== confirmPassword){
+      setNotice('Le due password non coincidono.');
+      return;
+    }
+
+    setSavingPassword(true);
+
+    const {error}=await supabase.auth.updateUser({
+      password:newPassword
+    });
+
+    setSavingPassword(false);
+
+    if(error){
+      setNotice('Errore durante il cambio password: '+error.message);
+      return;
+    }
+
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setNotice('Password modificata correttamente.');
   }
 
   const dayBookings=useMemo(
@@ -283,6 +325,9 @@ function App() {
 
         <div className="top-actions">
           <span className="live-dot">Sistema attivo</span>
+          <button type="button" className="logout" onClick={()=>{setNotice('');setShowPassword(true);}}>
+            <KeyRound size={17}/> Cambia password
+          </button>
           <span className="avatar large">{profile?.full_name?.[0]||'S'}</span>
         </div>
       </header>
@@ -393,6 +438,53 @@ function App() {
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
     </main>
+
+    {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">IL TUO ACCOUNT</span>
+            <h2>Modifica password.</h2>
+          </div>
+          <button type="button" className="icon-button" onClick={()=>setShowPassword(false)}><X/></button>
+        </div>
+
+        <form onSubmit={changePassword}>
+          <label>Nuova password
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e=>setNewPassword(e.target.value)}
+              placeholder="Almeno 8 caratteri"
+              minLength="8"
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <label>Conferma nuova password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e=>setConfirmPassword(e.target.value)}
+              placeholder="Ripeti la nuova password"
+              minLength="8"
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <div className="modal-note">
+            <LockKeyhole size={16}/> La password sarà aggiornata sul tuo account personale.
+          </div>
+
+          <button className="primary wide" type="submit" disabled={savingPassword}>
+            {savingPassword?'Aggiornamento…':'Salva nuova password'}
+            <ArrowRight size={17}/>
+          </button>
+        </form>
+      </div>
+    </div>}
 
     {showBooking&&<div className="modal-backdrop" onClick={()=>setShowBooking(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
