@@ -39,8 +39,8 @@ button { cursor: pointer; }
 .brand-dot { color: #d8f36b; }
 
 .club-logo {
-  width: 48px;
-  height: 48px;
+  width: 62px;
+  height: 62px;
   object-fit: contain;
   border-radius: 50%;
   background: white;
@@ -49,13 +49,13 @@ button { cursor: pointer; }
 }
 
 .sidebar .club-logo {
-  width: 52px;
-  height: 52px;
+  width: 66px;
+  height: 66px;
 }
 
 .login-art .club-logo {
-  width: 62px;
-  height: 62px;
+  width: 76px;
+  height: 76px;
 }
 
 .club-label {
@@ -1146,8 +1146,8 @@ button { cursor: pointer; }
   .setup-card h1 { font-size: 34px; }
 
   .sidebar .club-logo {
-    width: 43px;
-    height: 43px;
+    width: 58px;
+    height: 58px;
   }
 
   .app-footer {
