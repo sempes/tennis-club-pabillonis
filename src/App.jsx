@@ -12,42 +12,6 @@ const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate(
 const prettyDate = d => new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long'}).format(d);
 const hours = Array.from({length:24},(_,i)=>`${pad(i)}:00`);
 
-/*
- * Ordina i soci per cognome (A-Z), poi per nome.
- * Restituisce anche display_name nel formato "Cognome Nome".
- * Il valore originale full_name non viene modificato.
- *
- * NOTA: questa funzione assume che full_name sia memorizzato come
- * "Nome Cognome", come nel progetto attuale.
- */
-function sortMembersBySurname(members) {
-  const getParts = fullName => {
-    const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
-    const name = parts.shift() || '';
-    const surname = parts.join(' ');
-    return { name, surname };
-  };
-
-  return [...members]
-    .map(member => {
-      const { name, surname } = getParts(member.full_name);
-      return {
-        ...member,
-        display_name: [surname, name].filter(Boolean).join(' ')
-      };
-    })
-    .sort((a, b) => {
-      const A = getParts(a.full_name);
-      const B = getParts(b.full_name);
-
-      return A.surname.localeCompare(B.surname, 'it', {
-        sensitivity: 'base'
-      }) || A.name.localeCompare(B.name, 'it', {
-        sensitivity: 'base'
-      });
-    });
-}
-
 function Brand() {
   return (
     <div className="brand">
@@ -100,6 +64,7 @@ function TennisCourt() {
         </defs>
 
         <rect width="720" height="300" fill="url(#tennisOuter)"/>
+
         <rect x="140" y="48" width="440" height="204" fill="url(#tennisSurface)"/>
 
         <g fill="none" stroke="#ffffff" strokeWidth="3">
@@ -114,6 +79,7 @@ function TennisCourt() {
         <rect x="355" y="45" width="10" height="210" rx="2" fill="#18374c"/>
         <line x1="360" y1="48" x2="360" y2="252"
           stroke="#ffffff" strokeWidth="1" opacity=".7"/>
+
         <rect x="352" y="43" width="16" height="5" rx="2" fill="#ffffff"/>
         <rect x="352" y="252" width="16" height="5" rx="2" fill="#ffffff"/>
 
@@ -163,19 +129,6 @@ function App() {
     d.setDate(d.getDate()+n);
     return d;
   });
-
-  // Elenchi già ordinati e formattati per la visualizzazione.
-  const sortedAllMembers = useMemo(
-    () => sortMembersBySurname(allMembers),
-    [allMembers]
-  );
-
-  const availableBookingMembers = useMemo(
-    () => sortMembersBySurname(
-      members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile?.id)
-    ),
-    [members, busyMemberIds, profile?.id]
-  );
 
   useEffect(()=>{
     if(!configured) return;
@@ -746,13 +699,13 @@ function App() {
         </div>
 
         <div className="admin-list">
-          {sortedAllMembers.length===0
+          {allMembers.length===0
             ? <p className="muted">Nessun socio presente.</p>
-            : sortedAllMembers.map(m=><div className="admin-list-row" key={m.id}>
+            : allMembers.map(m=><div className="admin-list-row" key={m.id}>
                 <div className="member-info" style={{
                   display:'flex',alignItems:'center',gap:'12px',minWidth:0
                 }}>
-                  <b>{m.display_name}</b>
+                  <b>{m.full_name}</b>
                   <small className={`member-status ${
                     m.status==='active'?'status-active':
                     m.status==='suspended'?'status-suspended':'status-deleted'
@@ -1093,9 +1046,8 @@ function App() {
                 }}>
                   <option value="">Scegli socio{guestAllowed?' oppure ospite':''}</option>
                   {guestAllowed&&<option value="guest">Ospite esterno</option>}
-                  {availableBookingMembers.map(m=>
-                    <option key={m.id} value={m.id}>{m.display_name}</option>
-                  )}
+                  {members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id)
+                    .map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
                 </select>
                 {newBooking.players[i]==='guest'&&guestAllowed&&
                   <input placeholder="Nome e cognome ospite"
