@@ -1,11 +1,3 @@
-TC PABILLONIS Github App.jsx
-
-App.jsx  versione funzionante
-modifica orari selezionabili
-—————————————-
-  
-
-
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
