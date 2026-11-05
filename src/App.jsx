@@ -12,6 +12,23 @@ const pad = n => String(n).padStart(2, '0');
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const prettyDate = d => new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long'}).format(d);
 const hours = Array.from({length:24},(_,i)=>`${pad(i)}:00`);
+const bookingDuration = type => type === 'doubles' ? 120 : 60;
+function bookingStartDateTime(booking) {
+  return new Date(`${booking.booking_date}T${String(booking.start_time).slice(0,5)}:00`);
+}
+function bookingEndDateTime(booking) {
+  const end = bookingStartDateTime(booking);
+  end.setMinutes(end.getMinutes() + bookingDuration(booking.booking_type));
+  return end;
+}
+function intervalsOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+function bookingEndLabel(date, time, type) {
+  const end = new Date(`${date}T${time}:00`);
+  end.setMinutes(end.getMinutes() + bookingDuration(type));
+  return { time: `${pad(end.getHours())}:${pad(end.getMinutes())}`, nextDay: dateKey(end) !== date };
+}
 
 /* VISUALIZZA IL COGNOME PRIMA DEL NOME */
 function surnameFirst(fullName = '') {
@@ -190,7 +207,7 @@ function App() {
       supabase.from('profiles').select('*').eq('id',session.user.id).single(),
       supabase.from('profiles').select('id,full_name,email,status,role').order('full_name'),
       supabase.from('bookings').select('*,booking_players(*)')
-        .gte('booking_date',dateKey(new Date()))
+        .gte('booking_date',dateKey(new Date(Date.now()-24*60*60*1000)))
         .order('booking_date').order('start_time')
     ]);
 
@@ -268,11 +285,15 @@ function App() {
     setNotice('Password modificata correttamente.');
   }
 
-  const dayBookings=useMemo(
-    ()=>bookings.filter(b=>b.booking_date===selectedDate &&
-      (court==='all'||String(b.court_id)===court)),
-    [bookings,selectedDate,court]
-  );
+  const dayBookings=useMemo(()=>{
+    const dayStart=new Date(`${selectedDate}T00:00:00`);
+    const dayEnd=new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate()+1);
+    return bookings.filter(b=>{
+      if(court!=='all'&&String(b.court_id)!==court) return false;
+      return intervalsOverlap(bookingStartDateTime(b),bookingEndDateTime(b),dayStart,dayEnd);
+    });
+  },[bookings,selectedDate,court]);
 
   /*
    * ORARI PRENOTABILI:
@@ -284,22 +305,18 @@ function App() {
   const availableBookingHours=useMemo(()=>{
     const now=new Date();
     const isToday=selectedDate===dateKey(now);
-
+    const duration=bookingDuration(newBooking.type);
     return hours.filter(h=>{
-      if(isToday && h<=`${pad(now.getHours())}:00`){
-        return false;
-      }
-
-      const occupied=bookings.some(b=>
-        b.status==='active' &&
-        b.booking_date===selectedDate &&
+      if(isToday && h<=`${pad(now.getHours())}:00`) return false;
+      const candidateStart=new Date(`${selectedDate}T${h}:00`);
+      const candidateEnd=new Date(candidateStart);
+      candidateEnd.setMinutes(candidateEnd.getMinutes()+duration);
+      const occupied=bookings.some(b=>b.status==='active' &&
         String(b.court_id)===String(newBooking.court_id) &&
-        b.start_time.slice(0,5)===h
-      );
-
+        intervalsOverlap(candidateStart,candidateEnd,bookingStartDateTime(b),bookingEndDateTime(b)));
       return !occupied;
     });
-  },[bookings,selectedDate,newBooking.court_id]);
+  },[bookings,selectedDate,newBooking.court_id,newBooking.type]);
 
   /*
    * Se si cambia campo oppure un orario non è più disponibile,
@@ -319,11 +336,14 @@ function App() {
     }
   },[showBooking,availableBookingHours,newBooking.time]);
 
-  const busyMemberIds=useMemo(
-    ()=>new Set(bookings.filter(b=>b.status==='active')
-      .flatMap(b=>(b.booking_players||[]).map(p=>p.member_id).filter(Boolean))),
-    [bookings]
-  );
+  const busyMemberIds=useMemo(()=>{
+    const candidateStart=new Date(`${selectedDate}T${newBooking.time}:00`);
+    const candidateEnd=new Date(candidateStart);
+    candidateEnd.setMinutes(candidateEnd.getMinutes()+bookingDuration(newBooking.type));
+    return new Set(bookings.filter(b=>b.status==='active' && intervalsOverlap(
+      candidateStart,candidateEnd,bookingStartDateTime(b),bookingEndDateTime(b)
+    )).flatMap(b=>(b.booking_players||[]).map(p=>p.member_id).filter(Boolean)));
+  },[bookings,selectedDate,newBooking.time,newBooking.type]);
 
   const availableMembers=useMemo(()=>{
     const search=memberSearch.trim().toLocaleLowerCase('it');
@@ -365,11 +385,11 @@ function App() {
   }
 
   function bookingAt(c,t){
-    return dayBookings.find(b=>
-      String(b.court_id)===String(c) &&
-      b.start_time.slice(0,5)===t &&
-      b.status==='active'
-    );
+    const slotStart=new Date(`${selectedDate}T${t}:00`);
+    const slotEnd=new Date(slotStart);
+    slotEnd.setHours(slotEnd.getHours()+1);
+    return dayBookings.find(b=>String(b.court_id)===String(c) && b.status==='active' &&
+      intervalsOverlap(slotStart,slotEnd,bookingStartDateTime(b),bookingEndDateTime(b)));
   }
 
   function playerNames(b){
@@ -751,7 +771,7 @@ function App() {
 
             <TennisCourt/>
 
-            <div className="slots-head"><b>Orari</b><small>Slot da 60 minuti</small></div>
+            <div className="slots-head"><b>Orari</b><small>Singolo 60 min · Doppio 120 min</small></div>
             <div className="slots">
               {hours.map(t=>{
                 const b=bookingAt(c,t);
@@ -777,7 +797,7 @@ function App() {
                     {b
                       ? <div className="slot-info">
                           <b>{playerNames(b)}</b>
-                          <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+                          <small>{b.booking_type==='singles'?'Singolo':'Doppio'} · fino alle {bookingEndLabel(b.booking_date,b.start_time.slice(0,5),b.booking_type).time}{bookingEndLabel(b.booking_date,b.start_time.slice(0,5),b.booking_type).nextDay?' (+1 giorno)':''}</small>
                         </div>
                       : <small>{past?'Passato':'Libero'}</small>
                     }
@@ -1012,7 +1032,7 @@ function App() {
             fontWeight:600,
             color:'#193329'
           }}>
-            {selectedBooking.booking_type==='singles'?'Partita singola':'Partita doppia'} · 60 minuti
+            {selectedBooking.booking_type==='singles'?'Partita singola':'Partita doppia'} · {bookingDuration(selectedBooking.booking_type)} minuti · fino alle {bookingEndLabel(selectedBooking.booking_date,selectedBooking.start_time.slice(0,5),selectedBooking.booking_type).time}{bookingEndLabel(selectedBooking.booking_date,selectedBooking.start_time.slice(0,5),selectedBooking.booking_type).nextDay?' del giorno successivo':''}
           </div>
         </div>
 
@@ -1170,7 +1190,7 @@ function App() {
                 ? <option value="">Nessun orario disponibile</option>
                 : availableBookingHours.map(h=>(
                     <option key={h} value={h}>
-                      {h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}
+                      {h} – {bookingEndLabel(selectedDate,h,newBooking.type).time}{bookingEndLabel(selectedDate,h,newBooking.type).nextDay?' (+1 giorno)':''}
                     </option>
                   ))
               }
@@ -1276,7 +1296,7 @@ function App() {
           </div>
 
           <div className="modal-note">
-            <Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo
+            <Clock3 size={16}/> Durata: {bookingDuration(newBooking.type)} minuti · massimo 2 giorni in anticipo{bookingEndLabel(selectedDate,newBooking.time,newBooking.type).nextDay?' · termina il giorno successivo':''}
           </div>
           <button
             className="primary wide"
