@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
@@ -11,6 +12,36 @@ const pad = n => String(n).padStart(2, '0');
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const prettyDate = d => new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long'}).format(d);
 const hours = Array.from({length:24},(_,i)=>`${pad(i)}:00`);
+
+/* VISUALIZZA IL COGNOME PRIMA DEL NOME */
+function surnameFirst(fullName = '') {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length < 2) return fullName;
+
+  const firstName = parts[0];
+  const surname = parts.slice(1).join(' ');
+
+  return `${surname} ${firstName}`;
+}
+
+/* ORDINA ALFABETICAMENTE PER COGNOME */
+function sortBySurname(a, b) {
+  const surnameA = String(a.full_name || '').trim().split(/\s+/).slice(1).join(' ');
+  const surnameB = String(b.full_name || '').trim().split(/\s+/).slice(1).join(' ');
+
+  const comparison = surnameA.localeCompare(surnameB, 'it', {
+    sensitivity: 'base'
+  });
+
+  if (comparison !== 0) return comparison;
+
+  return String(a.full_name || '').localeCompare(
+    String(b.full_name || ''),
+    'it',
+    { sensitivity: 'base' }
+  );
+}
 
 function Brand() {
   return (
@@ -170,10 +201,18 @@ function App() {
     }
 
     if(!me) {
-      const memberList=(m||[]).filter(x=>x.role==='member');
+      const memberList=(m||[])
+        .filter(x=>x.role==='member')
+        .sort(sortBySurname);
+
       setAllMembers(memberList);
       setMembers(memberList.filter(x=>x.status==='active'));
-      setAdminProfiles((m||[]).filter(x=>x.role==='admin'));
+
+      setAdminProfiles(
+        (m||[])
+          .filter(x=>x.role==='admin')
+          .sort(sortBySurname)
+      );
     } else {
       setNotice('Errore caricamento soci: '+me.message);
     }
@@ -248,7 +287,9 @@ function App() {
   }
 
   function playerNames(b){
-    return (b.booking_players||[]).map(p=>p.display_name).join(' · ');
+    return (b.booking_players||[])
+      .map(p=>surnameFirst(p.display_name))
+      .join(' · ');
   }
 
   function canCancelBooking(b){
@@ -705,7 +746,7 @@ function App() {
                 <div className="member-info" style={{
                   display:'flex',alignItems:'center',gap:'12px',minWidth:0
                 }}>
-                  <b>{m.full_name}</b>
+                  <b>{surnameFirst(m.full_name)}</b>
                   <small className={`member-status ${
                     m.status==='active'?'status-active':
                     m.status==='suspended'?'status-suspended':'status-deleted'
@@ -793,7 +834,7 @@ function App() {
           : <div className="admin-list">
               {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
                 <div>
-                  <b>{a.full_name}</b>
+                  <b>{surnameFirst(a.full_name)}</b>
                   <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
                 </div>
                 <button type="button" onClick={()=>revokeAdmin(a.id)}>Revoca</button>
@@ -915,7 +956,7 @@ function App() {
               </div>
               <div style={{minWidth:0}}>
                 <b style={{display:'block',color:'#193329'}}>
-                  {p.display_name||`Giocatore ${i+1}`}
+                  {surnameFirst(p.display_name)||`Giocatore ${i+1}`}
                 </b>
                 <small style={{color:'#829087'}}>
                   Giocatore {i+1}
@@ -1046,8 +1087,11 @@ function App() {
                 }}>
                   <option value="">Scegli socio{guestAllowed?' oppure ospite':''}</option>
                   {guestAllowed&&<option value="guest">Ospite esterno</option>}
-                  {members.filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id)
-                    .map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
+                  {members
+                    .filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id)
+                    .map(m=><option key={m.id} value={m.id}>
+                      {surnameFirst(m.full_name)}
+                    </option>)}
                 </select>
                 {newBooking.players[i]==='guest'&&guestAllowed&&
                   <input placeholder="Nome e cognome ospite"
