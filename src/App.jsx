@@ -799,3 +799,687 @@ function App() {
           </article>)}
         </section>
       </>}
+            {activeView==='members'&&isAdmin&&<section className="admin-panel">
+        <div className="admin-heading">
+          <div>
+            <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
+            <h2>Gestione soci</h2>
+          </div>
+          <ShieldCheck/>
+        </div>
+
+        <h3>Nuovo socio</h3>
+        <form className="member-form" onSubmit={addMember}>
+          <input placeholder="Nome" value={newMember.name}
+            onChange={e=>setNewMember({...newMember,name:e.target.value})} required/>
+          <input placeholder="Cognome" value={newMember.surname}
+            onChange={e=>setNewMember({...newMember,surname:e.target.value})} required/>
+          <input type="email" placeholder="Email" value={newMember.email}
+            onChange={e=>setNewMember({...newMember,email:e.target.value})} required/>
+          <input type="password" placeholder="Password iniziale" value={newMember.password}
+            onChange={e=>setNewMember({...newMember,password:e.target.value})}
+            minLength="8" required/>
+          <button className="primary">Crea account <Plus size={16}/></button>
+        </form>
+
+        <div className="admin-heading admin-subheading">
+          <div>
+            <span className="eyebrow">ELENCO SOCI</span>
+            <h2>Soci registrati</h2>
+          </div>
+        </div>
+
+        <div className="admin-list">
+          {allMembers.length===0
+            ? <p className="muted">Nessun socio presente.</p>
+            : allMembers.map(m=><div className="admin-list-row" key={m.id}>
+                <div className="member-info" style={{
+                  display:'flex',alignItems:'center',gap:'12px',minWidth:0
+                }}>
+                  <b>{surnameFirst(m.full_name)}</b>
+                  <small className={`member-status ${
+                    m.status==='active'?'status-active':
+                    m.status==='suspended'?'status-suspended':'status-deleted'
+                  }`} style={{marginLeft:'6px'}}>
+                    <i/>
+                    {m.status==='active'?'Attivo':
+                      m.status==='suspended'?'Sospeso':'Eliminato'}
+                  </small>
+                </div>
+
+                <div className="member-actions" style={{position:'relative',marginLeft:'16px'}}>
+                  <button
+                    type="button"
+                    className="member-menu-button"
+                    aria-expanded={openMemberMenu===m.id}
+                    onClick={()=>setOpenMemberMenu(openMemberMenu===m.id?null:m.id)}
+                  >
+                    Azioni <ChevronDown size={15}/>
+                  </button>
+
+                  {openMemberMenu===m.id&&
+                    <div className="member-actions-menu" style={{
+                      position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:20,
+                      minWidth:'170px',padding:'6px',background:'#fff',
+                      border:'1px solid #e1e8e1',borderRadius:'12px',
+                      boxShadow:'0 10px 28px rgba(20,40,30,.14)',
+                      display:'grid',gap:'3px'
+                    }}>
+                      <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);editMember(m);}}>
+                        Modifica dati
+                      </button>
+                      {m.status==='active'&&
+                        <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'suspended');}}>
+                          Sospendi socio
+                        </button>}
+                      {m.status==='suspended'&&
+                        <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'active');}}>
+                          Riattiva socio
+                        </button>}
+                      {m.status!=='deleted'&&
+                        <button type="button" className="menu-danger" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#a33b32'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'deleted');}}>
+                          Disattiva socio
+                        </button>}
+                    </div>}
+                </div>
+              </div>)
+          }
+        </div>
+      </section>}
+
+      {activeView==='admins'&&isSuperAdmin&&<section className="admin-panel">
+        <div className="admin-heading">
+          <div>
+            <span className="eyebrow">AREA RISERVATA SUPER ADMIN</span>
+            <h2>Gestione amministratori</h2>
+          </div>
+          <ShieldCheck/>
+        </div>
+
+        <h3>Nuovo amministratore</h3>
+        <form className="member-form" onSubmit={addAdmin}>
+          <input placeholder="Nome" value={newAdmin.name}
+            onChange={e=>setNewAdmin({...newAdmin,name:e.target.value})} required/>
+          <input placeholder="Cognome" value={newAdmin.surname}
+            onChange={e=>setNewAdmin({...newAdmin,surname:e.target.value})} required/>
+          <input type="email" placeholder="Email" value={newAdmin.email}
+            onChange={e=>setNewAdmin({...newAdmin,email:e.target.value})} required/>
+          <input type="password" placeholder="Password iniziale" value={newAdmin.password}
+            onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})}
+            minLength="8" required/>
+          <button className="primary" disabled={savingAdmin}>
+            {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
+          </button>
+        </form>
+
+        <div className="admin-heading admin-subheading">
+          <div>
+            <span className="eyebrow">AMMINISTRATORI ATTUALI</span>
+            <h2>Elenco amministratori</h2>
+          </div>
+        </div>
+
+        {adminProfiles.length===0
+          ? <p className="muted">Non ci sono altri amministratori.</p>
+          : <div className="admin-list">
+              {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
+                <div>
+                  <b>{surnameFirst(a.full_name)}</b>
+                  <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
+                </div>
+                <button type="button" onClick={()=>revokeAdmin(a.id)}>Revoca</button>
+              </div>)}
+            </div>
+        }
+      </section>}
+
+      {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
+      {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
+      <ClabFooter/>
+    </main>
+
+    {/* FINESTRA DETTAGLIO PRENOTAZIONE */}
+    {selectedBooking&&<div
+      className="modal-backdrop"
+      onClick={()=>setSelectedBooking(null)}
+    >
+      <div
+        className="modal booking-detail-modal"
+        onClick={e=>e.stopPropagation()}
+        style={{maxWidth:'480px',width:'calc(100% - 32px)'}}
+      >
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">DETTAGLIO PRENOTAZIONE</span>
+            <h2>La partita.</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={()=>setSelectedBooking(null)}
+            aria-label="Chiudi dettagli"
+          >
+            <X/>
+          </button>
+        </div>
+
+        <div style={{
+          background:'#eaf2e4',
+          borderRadius:'14px',
+          padding:'16px',
+          marginBottom:'20px'
+        }}>
+          <div style={{
+            display:'flex',
+            justifyContent:'space-between',
+            alignItems:'center',
+            gap:'12px',
+            flexWrap:'wrap'
+          }}>
+            <span style={{fontWeight:700,color:'#193329'}}>
+              CAMPO {selectedBooking.court_id}
+            </span>
+            <span style={{
+              color:'#557b42',
+              fontSize:'13px',
+              fontWeight:600
+            }}>
+              PRENOTAZIONE CONFERMATA
+            </span>
+          </div>
+
+          <div style={{
+            fontSize:'30px',
+            fontWeight:800,
+            color:'#193329',
+            marginTop:'10px'
+          }}>
+            {selectedBooking.start_time.slice(0,5)}
+          </div>
+
+          <div style={{color:'#607365',marginTop:'4px'}}>
+            {prettyDate(new Date(`${selectedBooking.booking_date}T12:00:00`))}
+          </div>
+
+          <div style={{
+            display:'inline-block',
+            marginTop:'12px',
+            background:'#ffffff',
+            borderRadius:'20px',
+            padding:'6px 12px',
+            fontSize:'13px',
+            fontWeight:600,
+            color:'#193329'
+          }}>
+            {selectedBooking.booking_type==='singles'?'Partita singola':'Partita doppia'} · 60 minuti
+          </div>
+        </div>
+
+        <h3 style={{marginBottom:'12px'}}>Giocatori</h3>
+
+        <div style={{display:'grid',gap:'10px'}}>
+          {(selectedBooking.booking_players||[]).map((p,i)=>(
+            <div
+              key={p.id||i}
+              style={{
+                display:'flex',
+                alignItems:'center',
+                gap:'12px',
+                padding:'12px',
+                border:'1px solid #e3e9e2',
+                borderRadius:'12px',
+                background:'#ffffff'
+              }}
+            >
+              <div style={{
+                width:'38px',
+                height:'38px',
+                flexShrink:0,
+                borderRadius:'50%',
+                background:'#e8f4d1',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                fontSize:'19px'
+              }}>
+                🎾
+              </div>
+              <div style={{minWidth:0}}>
+                <b style={{display:'block',color:'#193329'}}>
+                  {surnameFirst(p.display_name)||`Giocatore ${i+1}`}
+                </b>
+                <small style={{color:'#829087'}}>
+                  Giocatore {i+1}
+                </small>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display:'grid',
+          gap:'10px',
+          marginTop:'22px'
+        }}>
+          {canCancelBooking(selectedBooking)&&
+            <button
+              type="button"
+              className="primary wide"
+              onClick={()=>cancelBooking(selectedBooking.id)}
+              style={{background:'#a33b32',color:'#ffffff'}}
+            >
+              <X size={17}/> Cancella prenotazione
+            </button>
+          }
+
+          <button
+            type="button"
+            className="wide"
+            onClick={()=>setSelectedBooking(null)}
+            style={{
+              padding:'13px',
+              borderRadius:'12px',
+              border:'1px solid #dce5dc',
+              background:'#ffffff',
+              color:'#193329',
+              fontWeight:600,
+              cursor:'pointer'
+            }}
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
+    </div>}
+
+    {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">IL TUO ACCOUNT</span>
+            <h2>Modifica password.</h2>
+          </div>
+          <button type="button" className="icon-button" onClick={()=>setShowPassword(false)}><X/></button>
+        </div>
+
+        <form onSubmit={changePassword}>
+          <label>Nuova password
+            <input type="password" value={newPassword}
+              onChange={e=>setNewPassword(e.target.value)}
+              placeholder="Almeno 8 caratteri" minLength="8"
+              autoComplete="new-password" required/>
+          </label>
+          <label>Conferma nuova password
+            <input type="password" value={confirmPassword}
+              onChange={e=>setConfirmPassword(e.target.value)}
+              placeholder="Ripeti la nuova password" minLength="8"
+              autoComplete="new-password" required/>
+          </label>
+          <div className="modal-note">
+            <LockKeyhole size={16}/> La password sarà aggiornata sul tuo account personale.
+          </div>
+          <button className="primary wide" type="submit" disabled={savingPassword}>
+            {savingPassword?'Aggiornamento…':'Salva nuova password'}
+            <ArrowRight size={17}/>
+          </button>
+        </form>
+      </div>
+    </div>}
+
+    {showBooking&&<div className="modal-backdrop" onClick={()=>setShowBooking(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">NUOVA PRENOTAZIONE</span>
+            <h2>Scendi in campo.</h2>
+          </div>
+          <button className="icon-button" onClick={()=>setShowBooking(false)}><X/></button>
+        </div>
+
+        <form onSubmit={createBooking}>
+          <label>Campo
+            <select
+              value={newBooking.court_id}
+              onChange={e=>setNewBooking({
+                ...newBooking,
+                court_id:e.target.value
+              })}
+            >
+              <option value="1">Campo 1</option>
+              <option value="2">Campo 2</option>
+            </select>
+          </label>
+
+          {/* MENU ORARI: MOSTRA SOLO GLI SLOT DISPONIBILI */}
+          <label>Orario
+            <select
+              value={
+                availableBookingHours.includes(newBooking.time)
+                  ? newBooking.time
+                  : ''
+              }
+              onChange={e=>setNewBooking({
+                ...newBooking,
+                time:e.target.value
+              })}
+              disabled={availableBookingHours.length===0}
+              required
+            >
+              {availableBookingHours.length===0
+                ? <option value="">Nessun orario disponibile</option>
+                : availableBookingHours.map(h=>(
+                    <option key={h} value={h}>
+                      {h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}
+                    </option>
+                  ))
+              }
+            </select>
+
+            {availableBookingHours.length===0&&
+              <small style={{
+                color:'#a33b32',
+                display:'block',
+                marginTop:'6px'
+              }}>
+                Non ci sono più orari disponibili per questo campo nella giornata selezionata.
+              </small>
+            }
+          </label>
+
+          <label>Tipo di partita
+            <select value={newBooking.type}
+              onChange={e=>setNewBooking({...newBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
+              <option value="singles">Singolo · 2 giocatori</option>
+              <option value="doubles">Doppio · 4 giocatori</option>
+            </select>
+          </label>
+
+          <div className="player-fields">
+            <b>Giocatori</b>
+
+            {Array.from({length:newBooking.type==='singles'?2:4},(_,i)=>{
+              const guestAllowed=newBooking.type==='singles'?i===1:i>=2;
+              const selectedId=newBooking.players[i];
+              const selectedMember=members.find(m=>m.id===selectedId);
+
+              return (
+                <div className="player-row" key={i}>
+                  <span>{i+1}</span>
+
+                  <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
+                    <button
+                      type="button"
+                      onClick={()=>openPlayerSelector(i)}
+                      style={{
+                        width:'100%',
+                        minHeight:'46px',
+                        padding:'10px 12px',
+                        border:'1px solid #dce5dc',
+                        borderRadius:'10px',
+                        background:'#ffffff',
+                        color:selectedMember?'#193329':'#829087',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'space-between',
+                        gap:'10px',
+                        textAlign:'left',
+                        cursor:'pointer',
+                        fontSize:'14px'
+                      }}
+                    >
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        {selectedMember
+                          ? surnameFirst(selectedMember.full_name)
+                          : selectedId==='guest'
+                            ? 'Ospite esterno'
+                            : 'Cerca e seleziona un socio'}
+                      </span>
+                      <Search size={17}/>
+                    </button>
+
+                    {guestAllowed&&
+                      <button
+                        type="button"
+                        onClick={()=>chooseGuest(i)}
+                        style={{
+                          justifySelf:'start',
+                          border:0,
+                          background:'transparent',
+                          color:'#557b42',
+                          padding:'3px 0',
+                          fontSize:'13px',
+                          fontWeight:600,
+                          cursor:'pointer'
+                        }}
+                      >
+                        {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
+                      </button>
+                    }
+
+                    {selectedId==='guest'&&guestAllowed&&
+                      <input
+                        placeholder="Nome e cognome ospite"
+                        value={newBooking.guests[i]||''}
+                        onChange={e=>{
+                          const a=[...newBooking.guests];
+                          a[i]=e.target.value;
+                          setNewBooking({...newBooking,guests:a});
+                        }}
+                        required
+                      />
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="modal-note">
+            <Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo
+          </div>
+          <button
+            className="primary wide"
+            type="submit"
+            disabled={availableBookingHours.length===0}
+          >
+            Conferma prenotazione <ArrowRight size={17}/>
+          </button>
+        </form>
+      </div>
+    </div>}
+
+    {/* FINESTRA RICERCA E SELEZIONE SOCI */}
+    {selectedPlayerIndex!==null&&
+      <div
+        className="modal-backdrop"
+        onClick={()=>{
+          setSelectedPlayerIndex(null);
+          setMemberSearch('');
+        }}
+        style={{zIndex:10000}}
+      >
+        <div
+          className="modal"
+          onClick={e=>e.stopPropagation()}
+          style={{
+            maxWidth:'460px',
+            width:'calc(100% - 28px)',
+            maxHeight:'85vh',
+            display:'flex',
+            flexDirection:'column',
+            overflow:'hidden'
+          }}
+        >
+          <div className="modal-top">
+            <div>
+              <span className="eyebrow">NUOVA PRENOTAZIONE</span>
+              <h2>Seleziona socio.</h2>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={()=>{
+                setSelectedPlayerIndex(null);
+                setMemberSearch('');
+              }}
+              aria-label="Chiudi selezione"
+            >
+              <X/>
+            </button>
+          </div>
+
+          <div style={{position:'relative',marginBottom:'14px'}}>
+            <Search
+              size={19}
+              style={{
+                position:'absolute',
+                left:'13px',
+                top:'50%',
+                transform:'translateY(-50%)',
+                color:'#829087'
+              }}
+            />
+            <input
+              type="search"
+              value={memberSearch}
+              onChange={e=>setMemberSearch(e.target.value)}
+              placeholder="Cerca per nome o cognome..."
+              autoFocus
+              style={{
+                width:'100%',
+                boxSizing:'border-box',
+                padding:'13px 14px 13px 42px',
+                border:'1px solid #dce5dc',
+                borderRadius:'12px',
+                fontSize:'15px',
+                outline:'none'
+              }}
+            />
+          </div>
+
+          <div style={{
+            fontSize:'12px',
+            color:'#829087',
+            marginBottom:'9px'
+          }}>
+            {availableMembers.length} soci disponibili
+          </div>
+
+          <div style={{
+            overflowY:'auto',
+            WebkitOverflowScrolling:'touch',
+            flex:1,
+            minHeight:0,
+            display:'grid',
+            alignContent:'start',
+            gap:'6px',
+            paddingBottom:'8px'
+          }}>
+            {availableMembers.length===0
+              ? <div style={{
+                  padding:'24px 12px',
+                  textAlign:'center',
+                  color:'#829087'
+                }}>
+                  Nessun socio trovato.
+                  <br/>
+                  Prova a modificare la ricerca.
+                </div>
+              : availableMembers.map(m=>(
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={()=>chooseMember(m.id)}
+                    style={{
+                      display:'flex',
+                      alignItems:'center',
+                      gap:'12px',
+                      width:'100%',
+                      padding:'12px',
+                      border:'1px solid #e5ebe4',
+                      borderRadius:'11px',
+                      background:'#ffffff',
+                      color:'#193329',
+                      textAlign:'left',
+                      cursor:'pointer',
+                      fontSize:'14px'
+                    }}
+                  >
+                    <span style={{
+                      width:'36px',
+                      height:'36px',
+                      flexShrink:0,
+                      borderRadius:'50%',
+                      background:'#e8f4d1',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      fontWeight:700,
+                      color:'#557b42'
+                    }}>
+                      {surnameFirst(m.full_name).charAt(0).toUpperCase()}
+                    </span>
+
+                    <span style={{
+                      flex:1,
+                      minWidth:0,
+                      fontWeight:600
+                    }}>
+                      {surnameFirst(m.full_name)}
+                    </span>
+
+                    <ArrowRight size={17} color="#829087"/>
+                  </button>
+                ))
+            }
+          </div>
+
+          <button
+            type="button"
+            onClick={()=>{
+              setSelectedPlayerIndex(null);
+              setMemberSearch('');
+            }}
+            style={{
+              width:'100%',
+              padding:'13px',
+              marginTop:'10px',
+              border:'1px solid #dce5dc',
+              borderRadius:'11px',
+              background:'#ffffff',
+              color:'#193329',
+              fontWeight:600,
+              cursor:'pointer'
+            }}
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
+    }
+  </div>;
+}
+
+function SetupScreen(){
+  return <div className="setup-screen">
+    <div className="setup-card">
+      <Brand/>
+      <span className="eyebrow">CONFIGURAZIONE INIZIALE</span>
+      <h1>Il club sta per<br/><em>scendere in campo.</em></h1>
+      <p>La parte grafica è pronta. Per attivare accessi e prenotazioni condivise occorre collegare il progetto al database Supabase gratuito.</p>
+      <ol>
+        <li>Crea un progetto su Supabase.</li>
+        <li>Esegui lo script <code>supabase/schema.sql</code> nel SQL Editor.</li>
+        <li>Copia URL e chiave anonima nel file <code>.env</code>.</li>
+        <li>Crea il primo utente amministratore e imposta il suo profilo come <code>admin</code>.</li>
+      </ol>
+      <div className="setup-warning">
+        <ShieldCheck/> Non inserire mai la chiave <b>service_role</b> nel sito: deve restare segreta sul server.
+      </div>
+      <p className="muted">Consulta il file README incluso nel progetto per la procedura completa e le funzioni server necessarie.</p>
+      <ClabFooter/>
+    </div>
+  </div>;
+}
+
+export default App;
