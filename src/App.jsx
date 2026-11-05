@@ -1,8 +1,7 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
-  Sparkles, X, KeyRound, LockKeyhole, ChevronDown
+  Sparkles, X, KeyRound, LockKeyhole, ChevronDown, Search
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
@@ -95,7 +94,6 @@ function TennisCourt() {
         </defs>
 
         <rect width="720" height="300" fill="url(#tennisOuter)"/>
-
         <rect x="140" y="48" width="440" height="204" fill="url(#tennisSurface)"/>
 
         <g fill="none" stroke="#ffffff" strokeWidth="3">
@@ -139,6 +137,8 @@ function App() {
   const [showBooking,setShowBooking] = useState(false);
   const [showPassword,setShowPassword] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
+  const [selectedPlayerIndex,setSelectedPlayerIndex] = useState(null);
+  const [memberSearch,setMemberSearch] = useState('');
   const [newPassword,setNewPassword] = useState('');
   const [confirmPassword,setConfirmPassword] = useState('');
   const [savingPassword,setSavingPassword] = useState(false);
@@ -177,6 +177,7 @@ function App() {
       setBookings([]);
       setAdminProfiles([]);
       setSelectedBooking(null);
+      setSelectedPlayerIndex(null);
     }
   },[session]);
 
@@ -278,6 +279,45 @@ function App() {
     [bookings]
   );
 
+  const availableMembers=useMemo(()=>{
+    const search=memberSearch.trim().toLocaleLowerCase('it');
+
+    return members
+      .filter(m=>!busyMemberIds.has(m.id)||m.id===profile?.id)
+      .filter(m=>!search||
+        surnameFirst(m.full_name).toLocaleLowerCase('it').includes(search)||
+        String(m.full_name||'').toLocaleLowerCase('it').includes(search)
+      )
+      .sort(sortBySurname);
+  },[members,busyMemberIds,profile,memberSearch]);
+
+  function openPlayerSelector(index){
+    setSelectedPlayerIndex(index);
+    setMemberSearch('');
+  }
+
+  function chooseMember(memberId){
+    if(selectedPlayerIndex===null) return;
+
+    const players=[...newBooking.players];
+    const guests=[...newBooking.guests];
+    players[selectedPlayerIndex]=memberId;
+    guests[selectedPlayerIndex]='';
+
+    setNewBooking({...newBooking,players,guests});
+    setSelectedPlayerIndex(null);
+    setMemberSearch('');
+  }
+
+  function chooseGuest(index){
+    const players=[...newBooking.players];
+    const guests=[...newBooking.guests];
+    players[index]='guest';
+    guests[index]='';
+
+    setNewBooking({...newBooking,players,guests});
+  }
+
   function bookingAt(c,t){
     return dayBookings.find(b=>
       String(b.court_id)===String(c) &&
@@ -361,6 +401,7 @@ function App() {
 
     setNotice('Prenotazione confermata!');
     setShowBooking(false);
+    setSelectedPlayerIndex(null);
     await loadData();
   }
 
@@ -847,8 +888,7 @@ function App() {
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
       <ClabFooter/>
     </main>
-
-    {/* FINESTRA DETTAGLIO PRENOTAZIONE */}
+        {/* FINESTRA DETTAGLIO PRENOTAZIONE */}
     {selectedBooking&&<div
       className="modal-backdrop"
       onClick={()=>setSelectedBooking(null)}
@@ -1074,35 +1114,81 @@ function App() {
 
           <div className="player-fields">
             <b>Giocatori</b>
+
             {Array.from({length:newBooking.type==='singles'?2:4},(_,i)=>{
               const guestAllowed=newBooking.type==='singles'?i===1:i>=2;
-              return <div className="player-row" key={i}>
-                <span>{i+1}</span>
-                <select value={newBooking.players[i]||''} onChange={e=>{
-                  const a=[...newBooking.players];
-                  a[i]=e.target.value;
-                  const g=[...newBooking.guests];
-                  g[i]='';
-                  setNewBooking({...newBooking,players:a,guests:g});
-                }}>
-                  <option value="">Scegli socio{guestAllowed?' oppure ospite':''}</option>
-                  {guestAllowed&&<option value="guest">Ospite esterno</option>}
-                  {members
-                    .filter(m=>!busyMemberIds.has(m.id)||m.id===profile.id)
-                    .map(m=><option key={m.id} value={m.id}>
-                      {surnameFirst(m.full_name)}
-                    </option>)}
-                </select>
-                {newBooking.players[i]==='guest'&&guestAllowed&&
-                  <input placeholder="Nome e cognome ospite"
-                    value={newBooking.guests[i]||''}
-                    onChange={e=>{
-                      const a=[...newBooking.guests];
-                      a[i]=e.target.value;
-                      setNewBooking({...newBooking,guests:a});
-                    }} required/>
-                }
-              </div>;
+              const selectedId=newBooking.players[i];
+              const selectedMember=members.find(m=>m.id===selectedId);
+
+              return (
+                <div className="player-row" key={i}>
+                  <span>{i+1}</span>
+
+                  <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
+                    <button
+                      type="button"
+                      onClick={()=>openPlayerSelector(i)}
+                      style={{
+                        width:'100%',
+                        minHeight:'46px',
+                        padding:'10px 12px',
+                        border:'1px solid #dce5dc',
+                        borderRadius:'10px',
+                        background:'#ffffff',
+                        color:selectedMember?'#193329':'#829087',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'space-between',
+                        gap:'10px',
+                        textAlign:'left',
+                        cursor:'pointer',
+                        fontSize:'14px'
+                      }}
+                    >
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        {selectedMember
+                          ? surnameFirst(selectedMember.full_name)
+                          : selectedId==='guest'
+                            ? 'Ospite esterno'
+                            : 'Cerca e seleziona un socio'}
+                      </span>
+                      <Search size={17}/>
+                    </button>
+
+                    {guestAllowed&&
+                      <button
+                        type="button"
+                        onClick={()=>chooseGuest(i)}
+                        style={{
+                          justifySelf:'start',
+                          border:0,
+                          background:'transparent',
+                          color:'#557b42',
+                          padding:'3px 0',
+                          fontSize:'13px',
+                          fontWeight:600,
+                          cursor:'pointer'
+                        }}
+                      >
+                        {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
+                      </button>
+                    }
+
+                    {selectedId==='guest'&&guestAllowed&&
+                      <input
+                        placeholder="Nome e cognome ospite"
+                        value={newBooking.guests[i]||''}
+                        onChange={e=>{
+                          const a=[...newBooking.guests];
+                          a[i]=e.target.value;
+                          setNewBooking({...newBooking,guests:a});
+                        }}
+                        required
+                      />
+                    }
+                  </div>
+                </div>
+              );
             })}
           </div>
 
@@ -1115,6 +1201,175 @@ function App() {
         </form>
       </div>
     </div>}
+        {/* FINESTRA RICERCA E SELEZIONE SOCI */}
+    {selectedPlayerIndex!==null&&
+      <div
+        className="modal-backdrop"
+        onClick={()=>{
+          setSelectedPlayerIndex(null);
+          setMemberSearch('');
+        }}
+        style={{zIndex:10000}}
+      >
+        <div
+          className="modal"
+          onClick={e=>e.stopPropagation()}
+          style={{
+            maxWidth:'460px',
+            width:'calc(100% - 28px)',
+            maxHeight:'85vh',
+            display:'flex',
+            flexDirection:'column',
+            overflow:'hidden'
+          }}
+        >
+          <div className="modal-top">
+            <div>
+              <span className="eyebrow">NUOVA PRENOTAZIONE</span>
+              <h2>Seleziona socio.</h2>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={()=>{
+                setSelectedPlayerIndex(null);
+                setMemberSearch('');
+              }}
+              aria-label="Chiudi selezione"
+            >
+              <X/>
+            </button>
+          </div>
+
+          <div style={{position:'relative',marginBottom:'14px'}}>
+            <Search
+              size={19}
+              style={{
+                position:'absolute',
+                left:'13px',
+                top:'50%',
+                transform:'translateY(-50%)',
+                color:'#829087'
+              }}
+            />
+            <input
+              type="search"
+              value={memberSearch}
+              onChange={e=>setMemberSearch(e.target.value)}
+              placeholder="Cerca per nome o cognome..."
+              autoFocus
+              style={{
+                width:'100%',
+                boxSizing:'border-box',
+                padding:'13px 14px 13px 42px',
+                border:'1px solid #dce5dc',
+                borderRadius:'12px',
+                fontSize:'15px',
+                outline:'none'
+              }}
+            />
+          </div>
+
+          <div style={{
+            fontSize:'12px',
+            color:'#829087',
+            marginBottom:'9px'
+          }}>
+            {availableMembers.length} soci disponibili
+          </div>
+
+          <div style={{
+            overflowY:'auto',
+            WebkitOverflowScrolling:'touch',
+            flex:1,
+            minHeight:0,
+            display:'grid',
+            alignContent:'start',
+            gap:'6px',
+            paddingBottom:'8px'
+          }}>
+            {availableMembers.length===0
+              ? <div style={{
+                  padding:'24px 12px',
+                  textAlign:'center',
+                  color:'#829087'
+                }}>
+                  Nessun socio trovato.
+                  <br/>
+                  Prova a modificare la ricerca.
+                </div>
+              : availableMembers.map(m=>(
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={()=>chooseMember(m.id)}
+                    style={{
+                      display:'flex',
+                      alignItems:'center',
+                      gap:'12px',
+                      width:'100%',
+                      padding:'12px',
+                      border:'1px solid #e5ebe4',
+                      borderRadius:'11px',
+                      background:'#ffffff',
+                      color:'#193329',
+                      textAlign:'left',
+                      cursor:'pointer',
+                      fontSize:'14px'
+                    }}
+                  >
+                    <span style={{
+                      width:'36px',
+                      height:'36px',
+                      flexShrink:0,
+                      borderRadius:'50%',
+                      background:'#e8f4d1',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      fontWeight:700,
+                      color:'#557b42'
+                    }}>
+                      {surnameFirst(m.full_name).charAt(0).toUpperCase()}
+                    </span>
+
+                    <span style={{
+                      flex:1,
+                      minWidth:0,
+                      fontWeight:600
+                    }}>
+                      {surnameFirst(m.full_name)}
+                    </span>
+
+                    <ArrowRight size={17} color="#829087"/>
+                  </button>
+                ))
+            }
+          </div>
+
+          <button
+            type="button"
+            onClick={()=>{
+              setSelectedPlayerIndex(null);
+              setMemberSearch('');
+            }}
+            style={{
+              width:'100%',
+              padding:'13px',
+              marginTop:'10px',
+              border:'1px solid #dce5dc',
+              borderRadius:'11px',
+              background:'#ffffff',
+              color:'#193329',
+              fontWeight:600,
+              cursor:'pointer'
+            }}
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
+    }
   </div>;
 }
 
