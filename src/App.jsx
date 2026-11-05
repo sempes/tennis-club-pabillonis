@@ -63,84 +63,35 @@ function TennisCourt() {
           </linearGradient>
         </defs>
 
-        {/* Fondo blu */}
         <rect width="720" height="300" fill="url(#tennisOuter)"/>
 
-        {/* Superficie del campo */}
-        <rect
-          x="140"
-          y="48"
-          width="440"
-          height="204"
-          fill="url(#tennisSurface)"
-        />
+        <rect x="140" y="48" width="440" height="204" fill="url(#tennisSurface)"/>
 
-        {/* Linee regolamentari */}
-        <g
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="3"
-        >
-          {/* Perimetro campo doppio */}
-          <rect
-            x="140"
-            y="48"
-            width="440"
-            height="204"
-          />
-
-          {/* Linee laterali singolare: corsie più strette */}
+        <g fill="none" stroke="#ffffff" strokeWidth="3">
+          <rect x="140" y="48" width="440" height="204"/>
           <line x1="140" y1="73.5" x2="580" y2="73.5"/>
           <line x1="140" y1="226.5" x2="580" y2="226.5"/>
-
-          {/* Linee di servizio */}
           <line x1="242" y1="73.5" x2="242" y2="226.5"/>
           <line x1="478" y1="73.5" x2="478" y2="226.5"/>
-
-          {/* Linea centrale di servizio */}
           <line x1="242" y1="150" x2="478" y2="150"/>
         </g>
 
-        {/* Rete centrale */}
-        <rect
-          x="355"
-          y="45"
-          width="10"
-          height="210"
-          rx="2"
-          fill="#18374c"
-        />
+        <rect x="355" y="45" width="10" height="210" rx="2" fill="#18374c"/>
+        <line x1="360" y1="48" x2="360" y2="252"
+          stroke="#ffffff" strokeWidth="1" opacity=".7"/>
 
-        <line
-          x1="360"
-          y1="48"
-          x2="360"
-          y2="252"
-          stroke="#ffffff"
-          strokeWidth="1"
-          opacity=".7"
-        />
-
-        {/* Pali della rete */}
         <rect x="352" y="43" width="16" height="5" rx="2" fill="#ffffff"/>
         <rect x="352" y="252" width="16" height="5" rx="2" fill="#ffffff"/>
 
-        {/* Nome del club */}
-        <text
-          x="690"
-          y="280"
-          textAnchor="end"
-          fill="#ffffff"
-          fontSize="11"
-          letterSpacing="3"
-          fontWeight="500"
-        >
+        <text x="690" y="280" textAnchor="end" fill="#ffffff"
+          fontSize="11" letterSpacing="3" fontWeight="500">
           TENNIS CLUB PABILLONIS
         </text>
       </svg>
     </div>
   );
 }
+
 function App() {
   const [session,setSession] = useState(null);
   const [profile,setProfile] = useState(null);
@@ -156,6 +107,7 @@ function App() {
   const [loginPassword,setLoginPassword] = useState('');
   const [showBooking,setShowBooking] = useState(false);
   const [showPassword,setShowPassword] = useState(false);
+  const [selectedBooking,setSelectedBooking] = useState(null);
   const [newPassword,setNewPassword] = useState('');
   const [confirmPassword,setConfirmPassword] = useState('');
   const [savingPassword,setSavingPassword] = useState(false);
@@ -171,6 +123,7 @@ function App() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isSuperAdmin = profile?.role === 'super_admin';
   const selected = new Date(`${selectedDate}T12:00:00`);
+
   const days = [0,1,2].map(n=>{
     const d=new Date();
     d.setDate(d.getDate()+n);
@@ -192,6 +145,7 @@ function App() {
       setAllMembers([]);
       setBookings([]);
       setAdminProfiles([]);
+      setSelectedBooking(null);
     }
   },[session]);
 
@@ -297,6 +251,11 @@ function App() {
     return (b.booking_players||[]).map(p=>p.display_name).join(' · ');
   }
 
+  function canCancelBooking(b){
+    return isAdmin ||
+      (b.booking_players||[]).some(p=>p.member_id===session?.user?.id);
+  }
+
   function canBook(){
     return profile?.status==='active';
   }
@@ -376,6 +335,7 @@ function App() {
       return;
     }
 
+    setSelectedBooking(null);
     setNotice('Prenotazione cancellata.');
     await loadData();
   }
@@ -664,21 +624,44 @@ function App() {
                 const b=bookingAt(c,t);
                 const past=selectedDate===dateKey(new Date())&&t<=`${pad(new Date().getHours())}:00`;
 
-                return <div key={t} className={`slot ${b?'occupied':''} ${past?'past':''}`}>
-                  <span>{t}</span>
-                  {b
-                    ? <div className="slot-info">
-                        <b>{playerNames(b)}</b>
-                        <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
-                      </div>
-                    : <small>{past?'Passato':'Libero'}</small>
-                  }
-                  {b&&(isAdmin||(b.booking_players||[]).some(p=>p.member_id===session.user.id))&&
-                    <button className="slot-cancel" title="Cancella" onClick={()=>cancelBooking(b.id)}>
-                      <X size={14}/>
-                    </button>
-                  }
-                </div>;
+                return (
+                  <div
+                    key={t}
+                    className={`slot ${b?'occupied':''} ${past?'past':''}`}
+                    onClick={b?()=>setSelectedBooking(b):undefined}
+                    role={b?'button':undefined}
+                    tabIndex={b?0:undefined}
+                    onKeyDown={b?(e)=>{
+                      if(e.key==='Enter'||e.key===' '){
+                        e.preventDefault();
+                        setSelectedBooking(b);
+                      }
+                    }:undefined}
+                    style={b?{cursor:'pointer'}:undefined}
+                    aria-label={b?`Apri dettagli prenotazione delle ${t}`:undefined}
+                  >
+                    <span>{t}</span>
+                    {b
+                      ? <div className="slot-info">
+                          <b>{playerNames(b)}</b>
+                          <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+                        </div>
+                      : <small>{past?'Passato':'Libero'}</small>
+                    }
+                    {b&&canCancelBooking(b)&&
+                      <button
+                        className="slot-cancel"
+                        title="Cancella"
+                        onClick={e=>{
+                          e.stopPropagation();
+                          cancelBooking(b.id);
+                        }}
+                      >
+                        <X size={14}/>
+                      </button>
+                    }
+                  </div>
+                );
               })}
             </div>
           </article>)}
@@ -720,10 +703,7 @@ function App() {
             ? <p className="muted">Nessun socio presente.</p>
             : allMembers.map(m=><div className="admin-list-row" key={m.id}>
                 <div className="member-info" style={{
-                  display:'flex',
-                  alignItems:'center',
-                  gap:'12px',
-                  minWidth:0
+                  display:'flex',alignItems:'center',gap:'12px',minWidth:0
                 }}>
                   <b>{m.full_name}</b>
                   <small className={`member-status ${
@@ -826,6 +806,160 @@ function App() {
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
       <ClabFooter/>
     </main>
+
+    {/* FINESTRA DETTAGLIO PRENOTAZIONE */}
+    {selectedBooking&&<div
+      className="modal-backdrop"
+      onClick={()=>setSelectedBooking(null)}
+    >
+      <div
+        className="modal booking-detail-modal"
+        onClick={e=>e.stopPropagation()}
+        style={{maxWidth:'480px',width:'calc(100% - 32px)'}}
+      >
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">DETTAGLIO PRENOTAZIONE</span>
+            <h2>La partita.</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={()=>setSelectedBooking(null)}
+            aria-label="Chiudi dettagli"
+          >
+            <X/>
+          </button>
+        </div>
+
+        <div style={{
+          background:'#eaf2e4',
+          borderRadius:'14px',
+          padding:'16px',
+          marginBottom:'20px'
+        }}>
+          <div style={{
+            display:'flex',
+            justifyContent:'space-between',
+            alignItems:'center',
+            gap:'12px',
+            flexWrap:'wrap'
+          }}>
+            <span style={{fontWeight:700,color:'#193329'}}>
+              CAMPO {selectedBooking.court_id}
+            </span>
+            <span style={{
+              color:'#557b42',
+              fontSize:'13px',
+              fontWeight:600
+            }}>
+              PRENOTAZIONE CONFERMATA
+            </span>
+          </div>
+
+          <div style={{
+            fontSize:'30px',
+            fontWeight:800,
+            color:'#193329',
+            marginTop:'10px'
+          }}>
+            {selectedBooking.start_time.slice(0,5)}
+          </div>
+
+          <div style={{color:'#607365',marginTop:'4px'}}>
+            {prettyDate(new Date(`${selectedBooking.booking_date}T12:00:00`))}
+          </div>
+
+          <div style={{
+            display:'inline-block',
+            marginTop:'12px',
+            background:'#ffffff',
+            borderRadius:'20px',
+            padding:'6px 12px',
+            fontSize:'13px',
+            fontWeight:600,
+            color:'#193329'
+          }}>
+            {selectedBooking.booking_type==='singles'?'Partita singola':'Partita doppia'} · 60 minuti
+          </div>
+        </div>
+
+        <h3 style={{marginBottom:'12px'}}>Giocatori</h3>
+
+        <div style={{display:'grid',gap:'10px'}}>
+          {(selectedBooking.booking_players||[]).map((p,i)=>(
+            <div
+              key={p.id||i}
+              style={{
+                display:'flex',
+                alignItems:'center',
+                gap:'12px',
+                padding:'12px',
+                border:'1px solid #e3e9e2',
+                borderRadius:'12px',
+                background:'#ffffff'
+              }}
+            >
+              <div style={{
+                width:'38px',
+                height:'38px',
+                flexShrink:0,
+                borderRadius:'50%',
+                background:'#e8f4d1',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                fontSize:'19px'
+              }}>
+                🎾
+              </div>
+              <div style={{minWidth:0}}>
+                <b style={{display:'block',color:'#193329'}}>
+                  {p.display_name||`Giocatore ${i+1}`}
+                </b>
+                <small style={{color:'#829087'}}>
+                  Giocatore {i+1}
+                </small>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display:'grid',
+          gap:'10px',
+          marginTop:'22px'
+        }}>
+          {canCancelBooking(selectedBooking)&&
+            <button
+              type="button"
+              className="primary wide"
+              onClick={()=>cancelBooking(selectedBooking.id)}
+              style={{background:'#a33b32',color:'#ffffff'}}
+            >
+              <X size={17}/> Cancella prenotazione
+            </button>
+          }
+
+          <button
+            type="button"
+            className="wide"
+            onClick={()=>setSelectedBooking(null)}
+            style={{
+              padding:'13px',
+              borderRadius:'12px',
+              border:'1px solid #dce5dc',
+              background:'#ffffff',
+              color:'#193329',
+              fontWeight:600,
+              cursor:'pointer'
+            }}
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
+    </div>}
 
     {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
