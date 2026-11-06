@@ -352,7 +352,31 @@ function App() {
     }
   },[showBooking,availableBookingHours,newBooking.time]);
 
-  const busyMemberIds=useMemo(()=>{
+  
+const busyMemberIds=useMemo(()=>{
+  const now=new Date();
+
+  const busyBookings=bookings.filter(b=>{
+    if(b.status!=='active') return false;
+
+    const endTime=String(b.end_time).slice(0,5);
+
+    const bookingEnd=new Date(
+      `${b.booking_date}T${endTime}:00`
+    );
+
+    return bookingEnd>now;
+  });
+
+  return new Set(
+    busyBookings.flatMap(b=>
+      (b.booking_players||[])
+        .map(p=>p.member_id)
+        .filter(Boolean)
+    )
+  );
+},[bookings]);
+
   const candidateStart=timeToMinutes(newBooking.time);
   const duration=newBooking.type==='doubles'?120:60;
   const candidateEnd=candidateStart+duration;
