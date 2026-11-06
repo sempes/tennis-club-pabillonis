@@ -331,17 +331,47 @@ function App() {
     }
   },[showBooking,availableBookingHours,newBooking.time]);
 
-  const busyMemberIds=useMemo(
-    ()=>new Set(bookings.filter(b=>b.status==='active')
-      .flatMap(b=>(b.booking_players||[]).map(p=>p.member_id).filter(Boolean))),
-    [bookings]
+  const busyMemberIds=useMemo(()=>{
+  const candidateStart=timeToMinutes(newBooking.time);
+  const duration=newBooking.type==='doubles'?120:60;
+  const candidateEnd=candidateStart+duration;
+
+  const overlappingBookings=bookings.filter(b=>{
+    if(
+      b.status!=='active' ||
+      b.booking_date!==selectedDate
+    ) return false;
+
+    const bookingStart=timeToMinutes(b.start_time);
+    let bookingEnd=timeToMinutes(b.end_time);
+
+    if(bookingEnd<=bookingStart){
+      bookingEnd+=24*60;
+    }
+
+    return candidateStart<bookingEnd &&
+           candidateEnd>bookingStart;
+  });
+
+  return new Set(
+    overlappingBookings.flatMap(b=>
+      (b.booking_players||[])
+        .map(p=>p.member_id)
+        .filter(Boolean)
+    )
   );
+},[
+  bookings,
+  selectedDate,
+  newBooking.time,
+  newBooking.type
+]);
 
   const availableMembers=useMemo(()=>{
     const search=memberSearch.trim().toLocaleLowerCase('it');
 
     return members
-      .filter(m=>!busyMemberIds.has(m.id)||m.id===profile?.id)
+      .filter(m=>!busyMemberIds.has(m.id))
       .filter(m=>!search||
         surnameFirst(m.full_name).toLocaleLowerCase('it').includes(search)||
         String(m.full_name||'').toLocaleLowerCase('it').includes(search)
