@@ -353,6 +353,7 @@ function App() {
   },[showBooking,availableBookingHours,newBooking.time]);
 
   
+
 const busyMemberIds=useMemo(()=>{
   const now=new Date();
 
@@ -376,41 +377,6 @@ const busyMemberIds=useMemo(()=>{
     )
   );
 },[bookings]);
-
-  const candidateStart=timeToMinutes(newBooking.time);
-  const duration=newBooking.type==='doubles'?120:60;
-  const candidateEnd=candidateStart+duration;
-
-  const overlappingBookings=bookings.filter(b=>{
-    if(
-      b.status!=='active' ||
-      b.booking_date!==selectedDate
-    ) return false;
-
-    const bookingStart=timeToMinutes(b.start_time);
-    let bookingEnd=timeToMinutes(b.end_time);
-
-    if(bookingEnd<=bookingStart){
-      bookingEnd+=24*60;
-    }
-
-    return candidateStart<bookingEnd &&
-           candidateEnd>bookingStart;
-  });
-
-  return new Set(
-    overlappingBookings.flatMap(b=>
-      (b.booking_players||[])
-        .map(p=>p.member_id)
-        .filter(Boolean)
-    )
-  );
-},[
-  bookings,
-  selectedDate,
-  newBooking.time,
-  newBooking.type
-]);
 
   const availableMembers=useMemo(()=>{
     const search=memberSearch.trim().toLocaleLowerCase('it');
