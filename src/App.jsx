@@ -981,6 +981,16 @@ const busyMemberIds=useMemo(()=>{
               <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
               <b>{pad(d.getDate())}</b>
               <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
+              <span style={{
+                display:'block',
+                marginTop:'3px',
+                fontSize:'11px',
+                lineHeight:1.2,
+                fontWeight:600,
+                textTransform:'capitalize'
+              }}>
+                {d.toLocaleDateString('it-IT',{weekday:'long'})}
+              </span>
             </button>)}
           </div>
         </section>
