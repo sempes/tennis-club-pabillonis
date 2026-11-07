@@ -688,7 +688,7 @@ const busyMemberIds=useMemo(()=>{
         : 'eliminare';
 
     const warning=status==='deleted'
-      ? 'Il socio non potrà più accedere. Lo storico delle prenotazioni sarà conservato. Vuoi continuare?'
+      ? `Vuoi eliminare ${member.full_name}? Il socio non potrà più accedere, ma il suo account e lo storico delle prenotazioni saranno conservati. Potrai riattivarlo in seguito.`
       : `Vuoi ${actionText} ${member.full_name}?`;
 
     if(!confirm(warning)) return;
@@ -707,7 +707,7 @@ const busyMemberIds=useMemo(()=>{
     }
 
     setNotice(status==='deleted'
-      ? 'Accesso del socio disattivato. Storico conservato.'
+      ? 'Socio eliminato correttamente. Account e storico conservati.'
       : status==='suspended'
         ? 'Socio sospeso correttamente.'
         : 'Socio riattivato correttamente.');
@@ -1131,13 +1131,13 @@ const busyMemberIds=useMemo(()=>{
                         <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'suspended');}}>
                           Sospendi socio
                         </button>}
-                      {m.status==='suspended'&&
+                      {(m.status==='suspended'||m.status==='deleted')&&
                         <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'active');}}>
                           Riattiva socio
                         </button>}
                       {m.status!=='deleted'&&
                         <button type="button" className="menu-danger" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#a33b32'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'deleted');}}>
-                          Disattiva socio
+                          Elimina socio
                         </button>}
                     </div>}
                 </div>
