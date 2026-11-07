@@ -161,6 +161,8 @@ function App() {
   const [loginEmail,setLoginEmail] = useState('');
   const [loginPassword,setLoginPassword] = useState('');
   const [recoveryMode,setRecoveryMode] = useState(false);
+  const [pendingRecoveryTokenHash,setPendingRecoveryTokenHash] = useState('');
+  const [verifyingRecovery,setVerifyingRecovery] = useState(false);
   const [sendingRecovery,setSendingRecovery] = useState(false);
   const [recoveryPassword,setRecoveryPassword] = useState('');
   const [confirmRecoveryPassword,setConfirmRecoveryPassword] = useState('');
@@ -193,11 +195,19 @@ function App() {
 
   useEffect(()=>{
     if(!configured) return;
+
+    // Il link email porta prima all'app: il token viene verificato
+    // soltanto dopo il clic esplicito dell'utente su "Continua".
+    const params = new URLSearchParams(window.location.search);
+    const recoveryToken = params.get('recovery_token_hash');
+    if (recoveryToken) setPendingRecoveryTokenHash(recoveryToken);
+
     supabase.auth.getSession().then(({data})=>setSession(data.session));
     const {data:{subscription}}=supabase.auth.onAuthStateChange((event,s)=>{
       setSession(s);
       if(event==='PASSWORD_RECOVERY'){
         setRecoveryMode(true);
+        setPendingRecoveryTokenHash('');
         setNotice('');
         setRecoveryPassword('');
         setConfirmRecoveryPassword('');
@@ -292,6 +302,30 @@ function App() {
     }
 
     setNotice('Se l’indirizzo è registrato, riceverai un’email con il link per scegliere una nuova password. Controlla anche la cartella spam.');
+  }
+
+  async function verifyRecoveryLink(){
+    if (!pendingRecoveryTokenHash || verifyingRecovery) return;
+
+    setNotice('');
+    setVerifyingRecovery(true);
+
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: pendingRecoveryTokenHash,
+      type: 'recovery'
+    });
+
+    setVerifyingRecovery(false);
+
+    if (error) {
+      setNotice('Il collegamento non è più valido o è scaduto. Richiedi una nuova email di recupero.');
+      return;
+    }
+
+    // Rimuove il token dall'indirizzo dopo la verifica.
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setPendingRecoveryTokenHash('');
+    setRecoveryMode(true);
   }
 
   async function completePasswordRecovery(e){
@@ -719,6 +753,40 @@ const busyMemberIds=useMemo(()=>{
   }
 
   if(!configured) return <SetupScreen />;
+
+  if(pendingRecoveryTokenHash) return <main className="login-shell">
+    <div className="login-art">
+      <Brand/>
+      <div className="art-copy">
+        <span className="eyebrow">TENNIS CLUB PABILLONIS</span>
+        <h1>Una nuova<br/><em>partita</em> comincia qui.</h1>
+        <p>Conferma il collegamento per scegliere una nuova password.</p>
+      </div>
+      <div className="court-lines"><i/><i/><i/><i/></div>
+      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
+    </div>
+    <section className="login-panel">
+      <div className="mobile-brand">
+        <img src={clubLogo} alt="Tennis Club Pabillonis"/>
+        <span>TENNIS CLUB <b>PABILLONIS</b></span>
+      </div>
+      <div className="login-card">
+        <span className="eyebrow">RECUPERO ACCOUNT</span>
+        <h2>Conferma il recupero.</h2>
+        <p>Per motivi di sicurezza, il collegamento verrà verificato soltanto quando premi il pulsante qui sotto.</p>
+        <button className="primary wide" type="button"
+          onClick={verifyRecoveryLink} disabled={verifyingRecovery}>
+          {verifyingRecovery?'Verifica in corso…':'Continua'} <ArrowRight size={17}/>
+        </button>
+        {notice&&<div className="notice">{notice}</div>}
+      </div>
+      <div className="login-bottom">© Tennis Club Pabillonis <span>•</span> Recupero password</div>
+      <div className="login-clab">
+        <span>Realizzato da</span>
+        <img src={clabLogo} alt="CLAB.C Solutions"/>
+      </div>
+    </section>
+  </main>;
 
   if(recoveryMode) return <main className="login-shell">
     <div className="login-art">
