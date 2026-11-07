@@ -1077,7 +1077,33 @@ button { cursor: pointer; }
 
   .date-tab {
     flex: 1;
-    height: 72px;
+    min-width: 0;
+    height: 104px;
+    padding: 8px 4px;
+    gap: 3px;
+    overflow: visible;
+  }
+
+  .date-tab small {
+    font-size: 8px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .date-tab b {
+    font-size: 25px;
+    line-height: 1.15;
+  }
+
+  .date-tab span {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .date-tab span:last-child {
+    margin-top: 3px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
   }
 
   .booking-toolbar { flex-wrap: wrap; }
