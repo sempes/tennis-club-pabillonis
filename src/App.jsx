@@ -160,6 +160,10 @@ function App() {
   const [notice,setNotice] = useState('');
   const [loginEmail,setLoginEmail] = useState('');
   const [loginPassword,setLoginPassword] = useState('');
+  const [recoveryMode,setRecoveryMode] = useState(false);
+  const [sendingRecovery,setSendingRecovery] = useState(false);
+  const [recoveryPassword,setRecoveryPassword] = useState('');
+  const [confirmRecoveryPassword,setConfirmRecoveryPassword] = useState('');
   const [showBooking,setShowBooking] = useState(false);
   const [showPassword,setShowPassword] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
@@ -190,13 +194,21 @@ function App() {
   useEffect(()=>{
     if(!configured) return;
     supabase.auth.getSession().then(({data})=>setSession(data.session));
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((event,s)=>{
+      setSession(s);
+      if(event==='PASSWORD_RECOVERY'){
+        setRecoveryMode(true);
+        setNotice('');
+        setRecoveryPassword('');
+        setConfirmRecoveryPassword('');
+      }
+    });
     return ()=>subscription.unsubscribe();
   },[]);
 
   useEffect(()=>{
-    if(session) loadData();
-    else {
+    if(session && !recoveryMode) loadData();
+    else if(!session) {
       setProfile(null);
       setMembers([]);
       setAllMembers([]);
@@ -205,7 +217,7 @@ function App() {
       setSelectedBooking(null);
       setSelectedPlayerIndex(null);
     }
-  },[session]);
+  },[session,recoveryMode]);
 
   async function loadData(){
     if(!session) return;
@@ -257,6 +269,58 @@ function App() {
       email:loginEmail,password:loginPassword
     });
     if(error) setNotice('Accesso non riuscito: verifica email e password.');
+  }
+
+  async function sendPasswordRecovery(){
+    setNotice('');
+    const email=loginEmail.trim();
+
+    if(!email){
+      setNotice('Inserisci prima il tuo indirizzo email.');
+      return;
+    }
+
+    setSendingRecovery(true);
+    const {error}=await supabase.auth.resetPasswordForEmail(email,{
+      redirectTo:window.location.origin
+    });
+    setSendingRecovery(false);
+
+    if(error){
+      setNotice('Non è stato possibile inviare l’email: '+error.message);
+      return;
+    }
+
+    setNotice('Se l’indirizzo è registrato, riceverai un’email con il link per scegliere una nuova password. Controlla anche la cartella spam.');
+  }
+
+  async function completePasswordRecovery(e){
+    e.preventDefault();
+    setNotice('');
+
+    if(recoveryPassword.length<8){
+      setNotice('La password deve contenere almeno 8 caratteri.');
+      return;
+    }
+
+    if(recoveryPassword!==confirmRecoveryPassword){
+      setNotice('Le due password non coincidono.');
+      return;
+    }
+
+    setSavingPassword(true);
+    const {error}=await supabase.auth.updateUser({password:recoveryPassword});
+    setSavingPassword(false);
+
+    if(error){
+      setNotice('Errore durante il ripristino della password: '+error.message);
+      return;
+    }
+
+    setRecoveryPassword('');
+    setConfirmRecoveryPassword('');
+    setRecoveryMode(false);
+    setNotice('Password aggiornata correttamente. Ora puoi utilizzare la nuova password.');
   }
 
   async function logout(){
@@ -656,6 +720,58 @@ const busyMemberIds=useMemo(()=>{
 
   if(!configured) return <SetupScreen />;
 
+  if(recoveryMode) return <main className="login-shell">
+    <div className="login-art">
+      <Brand/>
+      <div className="art-copy">
+        <span className="eyebrow">TENNIS CLUB PABILLONIS</span>
+        <h1>Una nuova<br/><em>partita</em> comincia qui.</h1>
+        <p>Scegli una nuova password per tornare nell’area soci.</p>
+      </div>
+      <div className="court-lines"><i/><i/><i/><i/></div>
+      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
+    </div>
+
+    <section className="login-panel">
+      <div className="mobile-brand">
+        <img src={clubLogo} alt="Tennis Club Pabillonis"/>
+        <span>TENNIS CLUB <b>PABILLONIS</b></span>
+      </div>
+
+      <div className="login-card">
+        <span className="eyebrow">RECUPERO ACCOUNT</span>
+        <h2>Crea una nuova password.</h2>
+        <p>Inserisci e conferma la nuova password. Deve contenere almeno 8 caratteri.</p>
+
+        <form onSubmit={completePasswordRecovery}>
+          <label>Nuova password
+            <input type="password" value={recoveryPassword}
+              onChange={e=>setRecoveryPassword(e.target.value)}
+              placeholder="Almeno 8 caratteri" minLength="8"
+              autoComplete="new-password" required/>
+          </label>
+          <label>Conferma nuova password
+            <input type="password" value={confirmRecoveryPassword}
+              onChange={e=>setConfirmRecoveryPassword(e.target.value)}
+              placeholder="Ripeti la nuova password" minLength="8"
+              autoComplete="new-password" required/>
+          </label>
+          <button className="primary wide" type="submit" disabled={savingPassword}>
+            {savingPassword?'Aggiornamento…':'Salva nuova password'} <ArrowRight size={17}/>
+          </button>
+        </form>
+
+        {notice&&<div className="notice">{notice}</div>}
+      </div>
+
+      <div className="login-bottom">© Tennis Club Pabillonis <span>•</span> Recupero password</div>
+      <div className="login-clab">
+        <span>Realizzato da</span>
+        <img src={clabLogo} alt="CLAB.C Solutions"/>
+      </div>
+    </section>
+  </main>;
+
   if(!session) return <main className="login-shell">
     <div className="login-art">
       <Brand/>
@@ -692,6 +808,24 @@ const busyMemberIds=useMemo(()=>{
           </label>
           <button className="primary wide">Accedi <ArrowRight size={17}/></button>
         </form>
+
+        <button
+          type="button"
+          onClick={sendPasswordRecovery}
+          disabled={sendingRecovery}
+          style={{
+            display:'block',
+            margin:'14px auto 0',
+            padding:'4px 8px',
+            border:0,
+            background:'transparent',
+            color:'#557b42',
+            fontWeight:600,
+            cursor:sendingRecovery?'wait':'pointer'
+          }}
+        >
+          {sendingRecovery?'Invio in corso…':'Password dimenticata?'}
+        </button>
 
         {notice&&<div className="notice">{notice}</div>}
         <small>Non hai ancora le credenziali? Rivolgiti all’amministratore del club.</small>
