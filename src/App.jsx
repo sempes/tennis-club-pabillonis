@@ -57,22 +57,14 @@ function Brand() {
         alt="Tennis Club Pabillonis"
       />
 
-      <span style={{
-        fontSize: 'clamp(14px, 4.2vw, 28px)',
-        fontWeight: 700,
-        whiteSpace: 'nowrap'
-      }}>
-        TC PABILLONIS
-        <span style={{
-          display: 'inline-block',
-          marginLeft: '7px',
-          fontSize: '0.9em',
-          verticalAlign: '-0.05em'
-        }}>
-          🎾
-        </span>
-      </span>
-    </div>
+      <<span className="brand-name">
+  <span className="brand-desktop">
+    TC<br />PABILLONIS 🎾
+  </span>
+  <span className="brand-mobile">
+    TC PABILLONIS 🎾
+  </span>
+</span>    </div>
   );
 }
 
