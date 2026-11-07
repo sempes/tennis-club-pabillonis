@@ -1186,3 +1186,29 @@ button { cursor: pointer; }
     width: 100px;
   }
 }
+/* Scritta del club: desktop su due righe */
+.brand-name {
+  font-size: clamp(14px, 4.2vw, 28px);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.brand-desktop {
+  display: inline;
+}
+
+.brand-mobile {
+  display: none;
+}
+
+/* Versione mobile: scritta su una sola riga */
+@media (max-width: 700px) {
+  .brand-desktop {
+    display: none;
+  }
+
+  .brand-mobile {
+    display: inline;
+    white-space: nowrap;
+  }
+}
