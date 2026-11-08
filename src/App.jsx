@@ -190,7 +190,13 @@ function App() {
   const [confirmPassword,setConfirmPassword] = useState('');
   const [savingPassword,setSavingPassword] = useState(false);
   const [newMember,setNewMember] = useState({name:'',surname:'',email:'',password:''});
-  const [newAdmin,setNewAdmin] = useState({name:'',surname:'',email:'',password:''});
+  const [newAdmin,setNewAdmin] = useState({
+  name:'',
+  surname:'',
+  email:'',
+  password:'',
+  role:'admin'
+});
   const [savingAdmin,setSavingAdmin] = useState(false);
   const [activeView,setActiveView] = useState('bookings');
   const [openMemberMenu,setOpenMemberMenu] = useState(null);
@@ -273,10 +279,10 @@ function App() {
       setMembers(memberList.filter(x=>x.status==='active'));
 
       setAdminProfiles(
-        (m||[])
-          .filter(x=>x.role==='admin')
-          .sort(sortBySurname)
-      );
+  (m||[])
+    .filter(x=>x.role==='admin'||x.role==='super_admin')
+    .sort(sortBySurname)
+);
     } else {
       setNotice('Errore caricamento soci: '+me.message);
     }
@@ -736,7 +742,12 @@ const busyMemberIds=useMemo(()=>{
     setSavingAdmin(true);
 
     const {data,error}=await supabase.functions.invoke('admin-manage-member',{
-      body:{...newAdmin,action:'create_admin'}
+      body:{
+  ...newAdmin,
+  action:newAdmin.role==='super_admin'
+    ? 'create_super_admin'
+    : 'create_admin'
+}
     });
 
     setSavingAdmin(false);
@@ -746,8 +757,21 @@ const busyMemberIds=useMemo(()=>{
       return;
     }
 
-    setNotice('Amministratore creato correttamente.');
-    setNewAdmin({name:'',surname:'',email:'',password:''});
+    setNotice(
+  newAdmin.role==='super_admin'
+    ? 'Super Amministratore creato correttamente.'
+    : 'Amministratore creato correttamente.'
+);
+
+setNewAdmin({
+  name:'',
+  surname:'',
+  email:'',
+  password:'',
+  role:'admin'
+});
+
+await loadData();
     await loadData();
   }
 
@@ -1191,6 +1215,13 @@ const busyMemberIds=useMemo(()=>{
           <input type="password" placeholder="Password iniziale" value={newAdmin.password}
             onChange={e=>setNewAdmin({...newAdmin,password:e.target.value})}
             minLength="8" required/>
+          <select
+  value={newAdmin.role}
+  onChange={e=>setNewAdmin({...newAdmin,role:e.target.value})}
+>
+  <option value="admin">Amministratore</option>
+  <option value="super_admin">Super Amministratore</option>
+</select>
           <button className="primary" disabled={savingAdmin}>
             {savingAdmin?'Creazione…':'Crea amministratore'} <Plus size={16}/>
           </button>
@@ -1209,9 +1240,14 @@ const busyMemberIds=useMemo(()=>{
               {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
                 <div>
                   <b>{surnameFirst(a.full_name)}</b>
-                  <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
+                  <small>{a.role==='super_admin'?'Super Amministratore':'Amministratore'}</small>
+<small>{a.status==='active'?'Attivo':'Non attivo'}</small>
                 </div>
-                <button type="button" onClick={()=>revokeAdmin(a.id)}>Revoca</button>
+                {a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
+  <button type="button" onClick={()=>revokeAdmin(a.id)}>
+    Revoca
+  </button>
+)}
               </div>)}
             </div>
         }
