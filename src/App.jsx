@@ -790,20 +790,13 @@ async function deleteAdmin(id){
   });
 
   if(error||data?.error){
-  let detail=data?.error;
+  console.error('DETTAGLIO ELIMINAZIONE:',data,error);
 
-  if(error){
-    try{
-      const response=error.context;
+  const detail=data?.details
+    ? JSON.stringify(data.details)
+    : data?.error||error?.message||'Errore sconosciuto';
 
-      if(response && typeof response.json==='function'){
-        const body=await response.json();
-        detail=body?.error||body?.message||JSON.stringify(body);
-      }
-    }catch(e){}
-  }
-
-  setNotice('Errore eliminazione: '+(detail||error?.message||'Errore sconosciuto'));
+  setNotice('Errore eliminazione: '+detail);
   return;
 }
 
