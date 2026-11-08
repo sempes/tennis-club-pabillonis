@@ -778,7 +778,7 @@ const busyMemberIds=useMemo(()=>{
         <p>Conferma il collegamento per scegliere una nuova password.</p>
       </div>
       <div className="court-lines"><i/><i/><i/><i/></div>
-      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
+      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 1981</span>
     </div>
     <section className="login-panel">
       <div className="mobile-brand">
@@ -812,7 +812,7 @@ const busyMemberIds=useMemo(()=>{
         <p>Scegli una nuova password per tornare nell’area soci.</p>
       </div>
       <div className="court-lines"><i/><i/><i/><i/></div>
-      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
+      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 1981</span>
     </div>
 
     <section className="login-panel">
@@ -864,7 +864,7 @@ const busyMemberIds=useMemo(()=>{
         <p>Prenota il campo, scegli i compagni e scendi in gioco.</p>
       </div>
       <div className="court-lines"><i/><i/><i/><i/></div>
-      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 2026</span>
+      <span className="art-footer">TENNIS CLUB PABILLONIS · DAL 1981</span>
     </div>
 
     <section className="login-panel">
