@@ -48,7 +48,23 @@ function sortBySurname(a, b) {
 }
 
 
-function Brand() {
+function Brand({ sidebar = false }) {
+  if (sidebar) {
+    return (
+      <div className="brand brand-sidebar">
+        <span className="brand-sidebar-title">
+          TC PABILLONIS
+        </span>
+
+        <img
+          className="club-logo"
+          src={clubLogo}
+          alt="Tennis Club Pabillonis"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="brand">
       <img
@@ -75,7 +91,6 @@ function Brand() {
     </div>
   );
 }
-
 
 function ClabFooter() {
   return (
@@ -909,7 +924,7 @@ const busyMemberIds=useMemo(()=>{
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <Brand/>
+      <Brand sidebar />
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
 
       <nav>
