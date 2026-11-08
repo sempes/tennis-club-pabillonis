@@ -772,9 +772,31 @@ setNewAdmin({
 });
 
 await loadData();
-    await loadData();
+  }
+async function deleteAdmin(id){
+  const target=adminProfiles.find(a=>a.id===id);
+
+  if(!target) return;
+
+  if(!confirm(
+    `ATTENZIONE!\n\nVuoi eliminare definitivamente ${target.full_name}?\n\nL'account non diventerà socio e non potrà più accedere. L'operazione non è reversibile.`
+  )) return;
+
+  const {data,error}=await supabase.functions.invoke('admin-manage-member',{
+    body:{
+      action:'delete_admin',
+      member_id:id
+    }
+  });
+
+  if(error||data?.error){
+    setNotice('Errore eliminazione: '+(data?.error||error?.message));
+    return;
   }
 
+  setNotice('Amministratore eliminato definitivamente.');
+  await loadData();
+}
   async function revokeAdmin(id){
     if(!confirm('Vuoi revocare i permessi di questo amministratore? Diventerà socio.')) return;
 
@@ -1244,9 +1266,15 @@ await loadData();
 <small>{a.status==='active'?'Attivo':'Non attivo'}</small>
                 </div>
                 {a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
-  <button type="button" onClick={()=>revokeAdmin(a.id)}>
-    Revoca
-  </button>
+  <>
+    <button type="button" onClick={()=>revokeAdmin(a.id)}>
+      Revoca
+    </button>
+
+    <button type="button" onClick={()=>deleteAdmin(a.id)}>
+      Elimina definitivamente
+    </button>
+  </>
 )}
               </div>)}
             </div>
