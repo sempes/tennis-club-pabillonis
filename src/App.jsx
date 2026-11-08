@@ -790,13 +790,27 @@ async function deleteAdmin(id){
   });
 
   if(error||data?.error){
-  console.error('DETTAGLIO ELIMINAZIONE:',data,error);
+  let detail=data?.error||'';
 
-  const detail=data?.details
-    ? JSON.stringify(data.details)
-    : data?.error||error?.message||'Errore sconosciuto';
+  if(error?.context){
+    try{
+      const response=error.context.clone
+        ? error.context.clone()
+        : error.context;
 
-  setNotice('Errore eliminazione: '+detail);
+      const body=await response.json();
+
+      detail=body?.error
+        ? body.error
+        : JSON.stringify(body);
+    }catch(e){
+      detail=error.message;
+    }
+  }
+
+  console.error('ERRORE DELETE ADMIN:',error,data);
+
+  setNotice('Errore eliminazione: '+(detail||error?.message||'Errore sconosciuto'));
   return;
 }
 
