@@ -790,9 +790,22 @@ async function deleteAdmin(id){
   });
 
   if(error||data?.error){
-    setNotice('Errore eliminazione: '+(data?.error||error?.message));
-    return;
+  let detail=data?.error;
+
+  if(error){
+    try{
+      const response=error.context;
+
+      if(response && typeof response.json==='function'){
+        const body=await response.json();
+        detail=body?.error||body?.message||JSON.stringify(body);
+      }
+    }catch(e){}
   }
+
+  setNotice('Errore eliminazione: '+(detail||error?.message||'Errore sconosciuto'));
+  return;
+}
 
   setNotice('Amministratore eliminato definitivamente.');
   await loadData();
