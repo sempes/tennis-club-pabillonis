@@ -1222,3 +1222,29 @@ button { cursor: pointer; }
     letter-spacing: -0.6px;
   }
 }
+
+/* ADATTAMENTO BRAND SU SMARTPHONE */
+@media (max-width: 700px) {
+  .sidebar .brand.brand-sidebar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: auto;
+  }
+
+  .sidebar .brand-sidebar-title {
+    order: 2;
+    width: auto;
+    font: 800 11px/1 Manrope, sans-serif;
+    letter-spacing: -0.3px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .sidebar .brand-sidebar .club-logo {
+    order: 1;
+    width: 58px;
+    height: 58px;
+  }
+}
