@@ -800,9 +800,9 @@ async function deleteAdmin(id){
 
       const body=await response.json();
 
-      detail=body?.error
-        ? body.error
-        : JSON.stringify(body);
+      detail=body?.details
+  ? JSON.stringify(body.details)
+  : body?.error||JSON.stringify(body);
     }catch(e){
       detail=error.message;
     }
