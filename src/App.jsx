@@ -173,6 +173,19 @@ function App() {
   const [court,setCourt] = useState('all');
   const [loading,setLoading] = useState(false);
   const [notice,setNotice] = useState('');
+  const [isOnline,setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+  const handleOnline = () => setIsOnline(true);
+  const handleOffline = () => setIsOnline(false);
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
   const [loginEmail,setLoginEmail] = useState('');
   const [loginPassword,setLoginPassword] = useState('');
   const [recoveryMode,setRecoveryMode] = useState(false);
@@ -835,6 +848,18 @@ async function deleteAdmin(id){
   }
 
   if(!configured) return <SetupScreen />;
+  if (!isOnline) {
+  return (
+    <main className="login-shell">
+      <div className="login-card">
+        <h2>Connessione Internet assente</h2>
+        <p>
+          Per utilizzare Tennis Club Pabillonis devi essere connesso a Internet.
+        </p>
+      </div>
+    </main>
+  );
+}
 
   if(pendingRecoveryTokenHash) return <main className="login-shell">
     <div className="login-art">
