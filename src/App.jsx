@@ -615,16 +615,17 @@ const busyMemberIds=useMemo(()=>{
     });
 
     if(error){
-      setNotice(
-        error.message.includes('member_already_booked')
-          ? 'Uno dei soci selezionati ha già una prenotazione attiva.'
-          : error.message.includes('slot_unavailable')
-            ? 'Questo orario è già occupato.'
-            : error.message
-      );
-      return;
-    }
-
+  setNotice(
+    error.message.includes('member_already_booked')
+      ? 'Uno dei soci selezionati ha già una prenotazione attiva.'
+      : error.message.includes('slot_unavailable')
+        ? 'Questo orario è già occupato.'
+        : error.message.includes('booking_owner_must_play')
+          ? 'Chi effettua la prenotazione deve essere uno dei giocatori.'
+          : 'Non è stato possibile completare la prenotazione. Verifica i dati e riprova.'
+  );
+  return;
+}
     setNotice('Prenotazione confermata!');
     setShowBooking(false);
     setSelectedPlayerIndex(null);
