@@ -715,40 +715,48 @@ const busyMemberIds=useMemo(()=>{
     await loadData();
   }
 
-  async function setMemberStatus(member,status){
-    const actionText=status==='suspended'
-      ? 'sospendere'
-      : status==='active'
-        ? 'riattivare'
-        : 'eliminare';
+  
+async function setMemberStatus(member, status) {
+  const isPermanentDelete = status === 'deleted';
 
-    const warning=status==='deleted'
-      ? `Vuoi eliminare ${member.full_name}? Il socio non potrà più accedere, ma il suo account e lo storico delle prenotazioni saranno conservati. Potrai riattivarlo in seguito.`
-      : `Vuoi ${actionText} ${member.full_name}?`;
+  const warning = isPermanentDelete
+    ? `ATTENZIONE! Vuoi eliminare definitivamente ${member.full_name}? L'account verrà cancellato e non potrà essere riattivato. Le prenotazioni e i nomi nello storico saranno conservati.`
+    : status === 'suspended'
+      ? `Vuoi sospendere ${member.full_name}?`
+      : `Vuoi riattivare ${member.full_name}?`;
 
-    if(!confirm(warning)) return;
+  if (!confirm(warning)) return;
 
-    const {data,error}=await supabase.functions.invoke('admin-manage-member',{
-      body:{
-        action:'update_member',
-        member_id:member.id,
-        status
+  const { data, error } = await supabase.functions.invoke(
+    'admin-manage-member',
+    {
+      body: {
+        action: isPermanentDelete ? 'delete_member' : 'update_member',
+        member_id: member.id,
+        ...(isPermanentDelete ? {} : { status })
       }
-    });
-
-    if(error||data?.error){
-      setNotice('Errore durante l’operazione: '+(data?.error||error?.message));
-      return;
     }
+  );
 
-    setNotice(status==='deleted'
-      ? 'Socio eliminato correttamente. Account e storico conservati.'
-      : status==='suspended'
-        ? 'Socio sospeso correttamente.'
-        : 'Socio riattivato correttamente.');
-
-    await loadData();
+  if (error || data?.error) {
+    setNotice(
+      'Errore durante l’operazione: ' +
+      (data?.error || error?.message)
+    );
+    return;
   }
+
+  setNotice(
+    isPermanentDelete
+      ? 'Socio eliminato definitivamente. Storico delle prenotazioni conservato.'
+      : status === 'suspended'
+        ? 'Socio sospeso correttamente.'
+        : 'Socio riattivato correttamente.'
+  );
+
+  await loadData();
+}
+
 
   async function addAdmin(e){
     e.preventDefault();
