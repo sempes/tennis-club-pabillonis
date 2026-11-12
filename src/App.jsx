@@ -169,6 +169,7 @@ function App() {
   const [allMembers,setAllMembers] = useState([]);
   const [adminProfiles,setAdminProfiles] = useState([]);
   const [bookings,setBookings] = useState([]);
+  const [events,setEvents] = useState([]);
   const [selectedDate,setSelectedDate] = useState(dateKey(new Date()));
   const [court,setCourt] = useState('all');
   const [loading,setLoading] = useState(false);
@@ -257,6 +258,7 @@ function App() {
       setMembers([]);
       setAllMembers([]);
       setBookings([]);
+      setEvents([]);
       setAdminProfiles([]);
       setSelectedBooking(null);
       setSelectedPlayerIndex(null);
@@ -267,12 +269,24 @@ function App() {
     if(!session) return;
     setLoading(true);
 
-    const [{data:p,error:pe},{data:m,error:me},{data:b,error:be}] = await Promise.all([
+    const [
+  {data:p,error:pe},
+  {data:m,error:me},
+  {data:b,error:be},
+  {data:ev,error:ee}
+] = await Promise.all([
       supabase.from('profiles').select('*').eq('id',session.user.id).single(),
       supabase.from('profiles').select('id,full_name,email,status,role').order('full_name'),
       supabase.from('bookings').select('*,booking_players(*)')
         .gte('booking_date',dateKey(new Date()))
-        .order('booking_date').order('start_time')
+        .order('booking_date').order('start_time'),
+      supabase.from('events')
+  .select('*,event_courts(court_id)')
+  .eq('status','active')
+  .gte('event_date',dateKey(new Date()))
+  .lte('event_date',dateKey(new Date(Date.now()+17*24*60*60*1000)))
+  .order('event_date')
+  .order('start_time')
     ]);
 
     if(pe) setNotice(pe.message);
@@ -301,7 +315,14 @@ function App() {
     }
 
     if(be) setNotice(be.message);
-    else setBookings(b||[]);
+else setBookings(b||[]);
+
+if(ee) {
+  setEvents([]);
+  setNotice('Errore caricamento eventi: '+ee.message);
+} else {
+  setEvents(ev||[]);
+}
 
     setLoading(false);
   }
@@ -557,9 +578,26 @@ const busyMemberIds=useMemo(()=>{
       let bookingEnd=timeToMinutes(b.end_time);
       if(bookingEnd<=bookingStart) bookingEnd+=24*60;
       return slotStart>=bookingStart && slotStart<bookingEnd;
+      
     });
   }
+function eventAt(c,t){
+  const slotStart=timeToMinutes(t);
 
+  return events.find(event=>{
+    if(event.event_date!==selectedDate) return false;
+
+    const eventCourtIds=(event.event_courts||[])
+      .map(ec=>String(ec.court_id));
+
+    if(!eventCourtIds.includes(String(c))) return false;
+
+    const eventStart=timeToMinutes(event.start_time);
+    const eventEnd=timeToMinutes(event.end_time);
+
+    return slotStart>=eventStart && slotStart<eventEnd;
+  });
+}
   function playerNames(b){
     return (b.booking_players||[])
       .map(p=>surnameFirst(p.display_name))
@@ -1184,12 +1222,13 @@ async function deleteAdmin(id){
             <div className="slots">
               {hours.map(t=>{
                 const b=bookingAt(c,t);
+    const ev=eventAt(c,t);
                 const past=selectedDate===dateKey(new Date())&&t<=`${pad(new Date().getHours())}:00`;
 
                 return (
                   <div
                     key={t}
-                    className={`slot ${b?'occupied':''} ${past?'past':''}`}
+                    className={`slot ${b?'occupied':ev?'event-occupied':''} ${past?'past':''}`}
                     onClick={b?()=>setSelectedBooking(b):undefined}
                     role={b?'button':undefined}
                     tabIndex={b?0:undefined}
@@ -1204,12 +1243,17 @@ async function deleteAdmin(id){
                   >
                     <span>{t}</span>
                     {b
-                      ? <div className="slot-info">
-                          <b>{playerNames(b)}</b>
-                          <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
-                        </div>
-                      : <small>{past?'Passato':'Libero'}</small>
-                    }
+  ? <div className="slot-info">
+      <b>{playerNames(b)}</b>
+      <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+    </div>
+  : ev
+    ? <div className="slot-info event-info">
+        <b>{ev.title}</b>
+        <small>Evento</small>
+      </div>
+    : <small>{past?'Passato':'Libero'}</small>
+}
                     {b&&canCancelBooking(b)&&
                       <button
                         className="slot-cancel"
