@@ -207,6 +207,7 @@ const [savingEvent,setSavingEvent] = useState(false);
   const [showBooking,setShowBooking] = useState(false);
   const [showPassword,setShowPassword] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
+  const [selectedEvent,setSelectedEvent] = useState(null);
   const [selectedPlayerIndex,setSelectedPlayerIndex] = useState(null);
   const [memberSearch,setMemberSearch] = useState('');
   const [newPassword,setNewPassword] = useState('');
@@ -1325,17 +1326,29 @@ async function deleteAdmin(id){
                   <div
                     key={t}
                     className={`slot ${b?'occupied':ev?'event-occupied':''} ${past?'past':''}`}
-                    onClick={b?()=>setSelectedBooking(b):undefined}
-                    role={b?'button':undefined}
-                    tabIndex={b?0:undefined}
-                    onKeyDown={b?(e)=>{
-                      if(e.key==='Enter'||e.key===' '){
-                        e.preventDefault();
-                        setSelectedBooking(b);
-                      }
-                    }:undefined}
-                    style={b?{cursor:'pointer'}:undefined}
-                    aria-label={b?`Apri dettagli prenotazione delle ${t}`:undefined}
+                    onClick={b
+  ? ()=>setSelectedBooking(b)
+  : ev
+    ? ()=>setSelectedEvent(ev)
+    : undefined
+}
+role={b||ev?'button':undefined}
+tabIndex={b||ev?0:undefined}
+                    onKeyDown={(b||ev)?(e)=>{
+  if(e.key==='Enter'||e.key===' '){
+    e.preventDefault();
+    if(b) setSelectedBooking(b);
+    else if(ev) setSelectedEvent(ev);
+  }
+}:undefined}
+                    style={b||ev?{cursor:'pointer'}:undefined}
+aria-label={
+  b
+    ? `Apri dettagli prenotazione delle ${t}`
+    : ev
+      ? `Apri dettagli evento ${ev.title}`
+      : undefined
+}
                   >
                     <span>{t}</span>
                     {b
@@ -1825,6 +1838,57 @@ async function deleteAdmin(id){
       </div>
     </div>}
 
+    {selectedEvent&&<div
+  className="modal-backdrop"
+  onClick={()=>setSelectedEvent(null)}
+>
+  <div
+    className="modal"
+    onClick={e=>e.stopPropagation()}
+    style={{maxWidth:'480px',width:'calc(100% - 32px)'}}
+  >
+    <div className="modal-top">
+      <div>
+        <span className="eyebrow">DETTAGLIO EVENTO</span>
+        <h2>{selectedEvent.title}</h2>
+      </div>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={()=>setSelectedEvent(null)}
+        aria-label="Chiudi dettagli evento"
+      >
+        <X/>
+      </button>
+    </div>
+
+    <div style={{background:'#eaf2e4',borderRadius:'14px',padding:'16px',marginBottom:'20px'}}>
+      <b>DATA</b>
+      <div>
+        {new Date(`${selectedEvent.event_date}T12:00:00`).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+      </div>
+
+      <div style={{marginTop:'12px'}}><b>ORARIO</b></div>
+      <div>{String(selectedEvent.start_time).slice(0,5)} - {String(selectedEvent.end_time).slice(0,5)}</div>
+
+      <div style={{marginTop:'12px'}}><b>CAMPO</b></div>
+      <div>{(selectedEvent.event_courts||[]).map(ec=>'Campo '+ec.court_id).join(' · ')}</div>
+    </div>
+
+    <h3>Descrizione</h3>
+    <p style={{whiteSpace:'pre-wrap',lineHeight:1.6}}>
+      {selectedEvent.description?.trim()||'Nessuna descrizione disponibile.'}
+    </p>
+
+    <button
+      type="button"
+      className="primary wide"
+      onClick={()=>setSelectedEvent(null)}
+    >
+      Chiudi
+    </button>
+  </div>
+</div>}
     {showPassword&&<div className="modal-backdrop" onClick={()=>setShowPassword(false)}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-top">
