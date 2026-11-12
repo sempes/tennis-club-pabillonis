@@ -1417,34 +1417,37 @@ aria-label={
             rows="3"
           />
 
-          <label>Data dell'evento</label>
-          <input
-            type="date"
-            value={eventForm.event_date}
-            min={dateKey(new Date())}
-            max={dateKey(new Date(Date.now()+17*24*60*60*1000))}
-            onChange={e=>setEventForm({...eventForm,event_date:e.target.value})}
-            required
-          />
+         <label>Data dell'evento</label>
+<input
+  type="date"
+  value={eventForm.event_date}
+  min={dateKey(new Date())}
+  max={dateKey(new Date(Date.now()+17*24*60*60*1000))}
+  onChange={e=>setEventForm({...eventForm,event_date:e.target.value})}
+  required
+/>
 
-          <label>Orario di inizio</label>
-          <input
-            type="time"
-            step="3600"
-            value={eventForm.start_time}
-            onChange={e=>setEventForm({...eventForm,start_time:e.target.value})}
-            required
-          />
+<label>Orario di inizio</label>
+<select
+  value={eventForm.start_time}
+  onChange={e=>setEventForm({...eventForm,start_time:e.target.value})}
+  required
+>
+  {Array.from({length:24},(_,h)=>`${String(h).padStart(2,'0')}:00`).map(t=>(
+    <option key={t} value={t}>{t}</option>
+  ))}
+</select>
 
-          <label>Orario di fine</label>
-          <input
-            type="time"
-            step="3600"
-            value={eventForm.end_time}
-            onChange={e=>setEventForm({...eventForm,end_time:e.target.value})}
-            required
-          />
-
+<label>Orario di fine</label>
+<select
+  value={eventForm.end_time}
+  onChange={e=>setEventForm({...eventForm,end_time:e.target.value})}
+  required
+>
+  {Array.from({length:24},(_,h)=>`${String(h).padStart(2,'0')}:00`).map(t=>(
+    <option key={t} value={t}>{t}</option>
+  ))}
+</select>
           <label>Campi da riservare</label>
 
           <div style={{display:'flex',gap:'20px',flexWrap:'wrap'}}>
