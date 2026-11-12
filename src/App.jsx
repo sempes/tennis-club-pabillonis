@@ -757,7 +757,53 @@ async function setMemberStatus(member, status) {
   await loadData();
 }
 
+  async function resetMemberPassword(member){
+    if(member.status==='deleted'){
+      setNotice('Non puoi reimpostare la password di un socio disattivato.');
+      return;
+    }
 
+    const password=prompt(
+      `Inserisci la nuova password temporanea per ${member.full_name} (minimo 8 caratteri):`
+    );
+
+    if(password===null) return;
+
+    if(password.length<8){
+      setNotice('La password deve contenere almeno 8 caratteri.');
+      return;
+    }
+
+    const confirmation=prompt('Conferma la nuova password temporanea:');
+
+    if(confirmation===null) return;
+
+    if(password!==confirmation){
+      setNotice('Le due password non coincidono.');
+      return;
+    }
+
+    const {data,error}=await supabase.functions.invoke(
+      'admin-manage-member',
+      {
+        body:{
+          action:'reset_member_password',
+          member_id:member.id,
+          password
+        }
+      }
+    );
+
+    if(error||data?.error){
+      setNotice(
+        'Errore reimpostazione password: '+
+        (data?.error||error?.message)
+      );
+      return;
+    }
+
+    setNotice(`Password temporanea aggiornata per ${member.full_name}.`);
+  }
   async function addAdmin(e){
     e.preventDefault();
     setNotice('');
@@ -1252,6 +1298,25 @@ async function deleteAdmin(id){
                       <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);editMember(m);}}>
                         Modifica dati
                       </button>
+                                            {m.status!=='deleted'&&
+                        <button
+                          type="button"
+                          style={{
+                            textAlign:'left',
+                            padding:'10px 12px',
+                            border:0,
+                            borderRadius:'8px',
+                            background:'transparent',
+                            cursor:'pointer',
+                            color:'#193329'
+                          }}
+                          onClick={()=>{
+                            setOpenMemberMenu(null);
+                            resetMemberPassword(m);
+                          }}
+                        >
+                          Reimposta password
+                        </button>}
                       {m.status==='active'&&
                         <button type="button" style={{textAlign:'left',padding:'10px 12px',border:0,borderRadius:'8px',background:'transparent',cursor:'pointer',color:'#193329'}} onClick={()=>{setOpenMemberMenu(null);setMemberStatus(m,'suspended');}}>
                           Sospendi socio
