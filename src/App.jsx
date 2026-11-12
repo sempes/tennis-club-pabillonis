@@ -728,7 +728,13 @@ function eventAt(c,t){
     setNotice('');
 
     if(!isAdmin) return;
-
+if(
+  !eventForm.start_time.endsWith(':00') ||
+  !eventForm.end_time.endsWith(':00')
+){
+  setNotice('Gli orari degli eventi devono essere impostati su ore intere (es. 17:00).');
+  return;
+}
     setSavingEvent(true);
 
     const {error}=await supabase.rpc('create_club_event',{
@@ -1424,6 +1430,7 @@ aria-label={
           <label>Orario di inizio</label>
           <input
             type="time"
+            step="3600"
             value={eventForm.start_time}
             onChange={e=>setEventForm({...eventForm,start_time:e.target.value})}
             required
@@ -1432,6 +1439,7 @@ aria-label={
           <label>Orario di fine</label>
           <input
             type="time"
+            step="3600"
             value={eventForm.end_time}
             onChange={e=>setEventForm({...eventForm,end_time:e.target.value})}
             required
