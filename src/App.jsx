@@ -1124,6 +1124,12 @@ async function deleteAdmin(id){
           <ShieldCheck size={18}/> Gestione soci
         </button>}
 
+        {isAdmin&&<button type="button"
+  className={activeView==='events'?'nav-active nav-button':'nav-button'}
+  onClick={()=>setActiveView('events')}>
+  <CalendarDays size={18}/> Gestione eventi
+</button>}
+
         {isSuperAdmin&&<button type="button"
           className={activeView==='admins'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('admins')}>
