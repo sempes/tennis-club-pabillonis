@@ -460,32 +460,46 @@ if(ee) {
    * - esclude gli orari già trascorsi se la data è oggi.
    */
   const availableBookingHours=useMemo(()=>{
-    const now=new Date();
-    const isToday=selectedDate===dateKey(now);
-    const duration=newBooking.type==='doubles'?120:60;
+  const now=new Date();
+  const isToday=selectedDate===dateKey(now);
+  const duration=newBooking.type==='doubles'?120:60;
 
-    return hours.filter(h=>{
-      const candidateStart=timeToMinutes(h);
-      const candidateEnd=candidateStart+duration;
+  return hours.filter(h=>{
+    const candidateStart=timeToMinutes(h);
+    const candidateEnd=candidateStart+duration;
 
-      if(isToday && candidateStart<=now.getHours()*60+now.getMinutes()){
-        return false;
-      }
+    if(isToday && candidateStart<=now.getHours()*60+now.getMinutes()){
+      return false;
+    }
 
-      const occupied=bookings.some(b=>{
-        if(b.status!=='active' || b.booking_date!==selectedDate ||
-          String(b.court_id)!==String(newBooking.court_id)) return false;
+    const occupied=bookings.some(b=>{
+      if(b.status!=='active' || b.booking_date!==selectedDate ||
+        String(b.court_id)!==String(newBooking.court_id)) return false;
 
-        const bookingStart=timeToMinutes(b.start_time);
-        let bookingEnd=timeToMinutes(b.end_time);
-        if(bookingEnd<=bookingStart) bookingEnd+=24*60;
+      const bookingStart=timeToMinutes(b.start_time);
+      let bookingEnd=timeToMinutes(b.end_time);
+      if(bookingEnd<=bookingStart) bookingEnd+=24*60;
 
-        return candidateStart<bookingEnd && candidateEnd>bookingStart;
-      });
-
-      return !occupied;
+      return candidateStart<bookingEnd && candidateEnd>bookingStart;
     });
-  },[bookings,selectedDate,newBooking.court_id,newBooking.type]);
+
+    const occupiedByEvent=events.some(event=>{
+      if(event.status!=='active' || event.event_date!==selectedDate) return false;
+
+      const eventCourts=(event.event_courts||[])
+        .map(ec=>String(ec.court_id));
+
+      if(!eventCourts.includes(String(newBooking.court_id))) return false;
+
+      const eventStart=timeToMinutes(event.start_time);
+      const eventEnd=timeToMinutes(event.end_time);
+
+      return candidateStart<eventEnd && candidateEnd>eventStart;
+    });
+
+    return !occupied && !occupiedByEvent;
+  });
+},[bookings,events,selectedDate,newBooking.court_id,newBooking.type]);
 
   /*
    * Se si cambia campo oppure un orario non è più disponibile,
