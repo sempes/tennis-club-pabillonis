@@ -524,6 +524,25 @@ button { cursor: pointer; }
 
 .slot.occupied>span { color: #718b47; }
 
+/* EVENTI DEL CLUB */
+.slot.event-occupied {
+  background: #fff1df;
+  border-color: #edc58e;
+}
+
+.slot.event-occupied>span {
+  color: #a66a24;
+}
+
+.slot.event-info b {
+  color: #92591c;
+}
+
+.slot.event-info small {
+  color: #a66a24;
+  font-weight: 700;
+}
+
 .slot-info b {
   font-size: 8px;
   display: block;
