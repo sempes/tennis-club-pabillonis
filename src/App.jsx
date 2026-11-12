@@ -170,6 +170,15 @@ function App() {
   const [adminProfiles,setAdminProfiles] = useState([]);
   const [bookings,setBookings] = useState([]);
   const [events,setEvents] = useState([]);
+  const [eventForm,setEventForm] = useState({
+  title:'',
+  description:'',
+  event_date:dateKey(new Date()),
+  start_time:'09:00',
+  end_time:'10:00',
+  court_ids:['1']
+});
+const [savingEvent,setSavingEvent] = useState(false);
   const [selectedDate,setSelectedDate] = useState(dateKey(new Date()));
   const [court,setCourt] = useState('all');
   const [loading,setLoading] = useState(false);
@@ -713,7 +722,74 @@ function eventAt(c,t){
     setNotice('Prenotazione cancellata.');
     await loadData();
   }
+  async function createEvent(e){
+    e.preventDefault();
+    setNotice('');
 
+    if(!isAdmin) return;
+
+    setSavingEvent(true);
+
+    const {error}=await supabase.rpc('create_club_event',{
+      p_title:eventForm.title.trim(),
+      p_description:eventForm.description.trim(),
+      p_event_date:eventForm.event_date,
+      p_start_time:eventForm.start_time,
+      p_end_time:eventForm.end_time,
+      p_court_ids:eventForm.court_ids.map(Number)
+    });
+
+    setSavingEvent(false);
+
+    if(error){
+      const message=error.message||'';
+
+      setNotice(
+        message.includes('event_overlaps_booking')
+          ? 'Non puoi creare l’evento: uno dei campi è già prenotato in quell’orario.'
+          : message.includes('event_overlaps_event')
+            ? 'Esiste già un altro evento in quell’orario.'
+            : message.includes('event_horizon_invalid')
+              ? 'La data deve essere compresa tra oggi e i prossimi 17 giorni.'
+              : message.includes('court_not_active')
+                ? 'Uno dei campi selezionati non è attivo.'
+                : message.includes('invalid_event_time')
+                  ? 'Controlla gli orari: quello finale deve essere successivo a quello iniziale.'
+                  : 'Errore durante la creazione dell’evento: '+message
+      );
+      return;
+    }
+
+    setEventForm({
+      title:'',
+      description:'',
+      event_date:dateKey(new Date()),
+      start_time:'09:00',
+      end_time:'10:00',
+      court_ids:['1']
+    });
+
+    setNotice('Evento creato correttamente.');
+    await loadData();
+  }
+
+  async function cancelEvent(id){
+    if(!isAdmin) return;
+
+    if(!confirm('Vuoi annullare questo evento?')) return;
+
+    const {error}=await supabase.rpc('cancel_club_event',{
+      p_event_id:id
+    });
+
+    if(error){
+      setNotice('Errore durante l’annullamento dell’evento: '+error.message);
+      return;
+    }
+
+    setNotice('Evento annullato correttamente.');
+    await loadData();
+  }
   async function addMember(e){
     e.preventDefault();
     setNotice('');
@@ -1292,8 +1368,134 @@ async function deleteAdmin(id){
             </div>
           </article>)}
         </section>
+      
       </>}
-            {activeView==='members'&&isAdmin&&<section className="admin-panel">
+
+      {activeView==='events'&&isAdmin&&<section className="admin-panel">
+        <div className="admin-heading">
+          <div>
+            <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
+            <h2>Gestione eventi</h2>
+          </div>
+          <CalendarDays/>
+        </div>
+
+        <h3>Organizza un nuovo evento</h3>
+
+        <form className="member-form" onSubmit={createEvent}>
+          <input
+            type="text"
+            placeholder="Titolo dell'evento"
+            value={eventForm.title}
+            onChange={e=>setEventForm({...eventForm,title:e.target.value})}
+            required
+          />
+
+          <textarea
+            placeholder="Descrizione dell'evento"
+            value={eventForm.description}
+            onChange={e=>setEventForm({...eventForm,description:e.target.value})}
+            rows="3"
+          />
+
+          <label>Data dell'evento</label>
+          <input
+            type="date"
+            value={eventForm.event_date}
+            min={dateKey(new Date())}
+            max={dateKey(new Date(Date.now()+17*24*60*60*1000))}
+            onChange={e=>setEventForm({...eventForm,event_date:e.target.value})}
+            required
+          />
+
+          <label>Orario di inizio</label>
+          <input
+            type="time"
+            value={eventForm.start_time}
+            onChange={e=>setEventForm({...eventForm,start_time:e.target.value})}
+            required
+          />
+
+          <label>Orario di fine</label>
+          <input
+            type="time"
+            value={eventForm.end_time}
+            onChange={e=>setEventForm({...eventForm,end_time:e.target.value})}
+            required
+          />
+
+          <label>Campi da riservare</label>
+
+          <div style={{display:'flex',gap:'20px',flexWrap:'wrap'}}>
+            {[1,2].map(c=><label key={c} style={{
+              display:'flex',alignItems:'center',gap:'8px'
+            }}>
+              <input
+                type="checkbox"
+                checked={eventForm.court_ids.includes(String(c))}
+                onChange={e=>setEventForm({
+                  ...eventForm,
+                  court_ids:e.target.checked
+                    ? [...eventForm.court_ids,String(c)]
+                    : eventForm.court_ids.filter(id=>id!==String(c))
+                })}
+              />
+              Campo {c}
+            </label>)}
+          </div>
+
+          <button
+            type="submit"
+            className="primary"
+            disabled={savingEvent||eventForm.court_ids.length===0}
+          >
+            <Plus size={16}/>
+            {savingEvent?'Creazione in corso...':'Crea evento'}
+          </button>
+        </form>
+
+        <div className="admin-heading admin-subheading">
+          <div>
+            <span className="eyebrow">CALENDARIO EVENTI</span>
+            <h2>Eventi programmati</h2>
+          </div>
+        </div>
+
+        <div className="admin-list">
+          {events.length===0
+            ? <p className="muted">Non ci sono eventi programmati.</p>
+            : events.map(ev=><div className="admin-list-row" key={ev.id}>
+                <div style={{display:'grid',gap:'5px',minWidth:0}}>
+                  <b>{ev.title}</b>
+                  <small>
+                    {new Date(ev.event_date+'T00:00:00').toLocaleDateString('it-IT')}
+                    {' · '}
+                    {String(ev.start_time).slice(0,5)}
+                    {' - '}
+                    {String(ev.end_time).slice(0,5)}
+                  </small>
+                  <small>
+                    {(ev.event_courts||[])
+                      .map(ec=>'Campo '+ec.court_id)
+                      .join(' · ')}
+                  </small>
+                  {ev.description&&<small>{ev.description}</small>}
+                </div>
+
+                <button
+                  type="button"
+                  className="menu-danger"
+                  onClick={()=>cancelEvent(ev.id)}
+                >
+                  Annulla evento
+                </button>
+              </div>)
+          }
+        </div>
+      </section>}
+
+      {activeView==='members'&&isAdmin&&<section className="admin-panel">
+
         <div className="admin-heading">
           <div>
             <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
