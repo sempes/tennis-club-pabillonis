@@ -1681,29 +1681,130 @@ aria-label={
           </div>
         </div>
 
-        {adminProfiles.length===0
-          ? <p className="muted">Non ci sono altri amministratori.</p>
-          : <div className="admin-list">
-              {adminProfiles.map(a=><div className="admin-list-row" key={a.id}>
-                <div>
-                  <b>{surnameFirst(a.full_name)}</b>
-                  <small>{a.role==='super_admin'?'Super Amministratore':'Amministratore'}</small>
-<small>{a.status==='active'?'Attivo':'Non attivo'}</small>
-                </div>
-                {a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
-  <>
-    <button type="button" onClick={()=>revokeAdmin(a.id)}>
-      Revoca
-    </button>
+        
+{adminProfiles.length===0
+  ? <p className="muted">Non ci sono altri amministratori.</p>
+  : <div className="admin-list">
+      {adminProfiles.map(a=><div
+        className="admin-list-row"
+        key={a.id}
+        style={{
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'space-between',
+          gap:'16px',
+          flexWrap:'wrap'
+        }}
+      >
+        <div className="member-info" style={{
+          display:'flex',
+          alignItems:'center',
+          gap:'12px',
+          flexWrap:'wrap',
+          minWidth:0,
+          flex:'1 1 260px'
+        }}>
+          <b>{surnameFirst(a.full_name)}</b>
 
-    <button type="button" onClick={()=>deleteAdmin(a.id)}>
-      Elimina definitivamente
-    </button>
-  </>
-)}
-              </div>)}
-            </div>
-        }
+          <small style={{
+            color:'#718078',
+            fontSize:'13px',
+            lineHeight:1.4
+          }}>
+            {a.role==='super_admin'
+              ? 'Super Amministratore'
+              : 'Amministratore'}
+          </small>
+
+          <small className={`member-status ${
+            a.status==='active'
+              ? 'status-active'
+              : 'status-suspended'
+          }`}>
+            <i/>
+            {a.status==='active'?'Attivo':'Non attivo'}
+          </small>
+        </div>
+
+        {a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
+          <div className="member-actions" style={{
+            position:'relative',
+            marginLeft:'auto',
+            flexShrink:0
+          }}>
+            <button
+              type="button"
+              className="member-menu-button"
+              aria-expanded={openMemberMenu===a.id}
+              aria-haspopup="true"
+              onClick={()=>setOpenMemberMenu(
+                openMemberMenu===a.id?null:a.id
+              )}
+            >
+              Azioni <ChevronDown size={15}/>
+            </button>
+
+            {openMemberMenu===a.id&&
+              <div className="member-actions-menu" style={{
+                position:'absolute',
+                right:0,
+                top:'calc(100% + 6px)',
+                zIndex:20,
+                minWidth:'210px',
+                padding:'6px',
+                background:'#fff',
+                border:'1px solid #e1e8e1',
+                borderRadius:'12px',
+                boxShadow:'0 10px 28px rgba(20,40,30,.14)',
+                display:'grid',
+                gap:'3px'
+              }}>
+                <button
+                  type="button"
+                  style={{
+                    textAlign:'left',
+                    padding:'10px 12px',
+                    border:0,
+                    borderRadius:'8px',
+                    background:'transparent',
+                    cursor:'pointer',
+                    color:'#193329'
+                  }}
+                  onClick={()=>{
+                    setOpenMemberMenu(null);
+                    revokeAdmin(a.id);
+                  }}
+                >
+                  Revoca amministratore
+                </button>
+
+                <button
+                  type="button"
+                  className="menu-danger"
+                  style={{
+                    textAlign:'left',
+                    padding:'10px 12px',
+                    border:0,
+                    borderRadius:'8px',
+                    background:'transparent',
+                    cursor:'pointer',
+                    color:'#a33b32'
+                  }}
+                  onClick={()=>{
+                    setOpenMemberMenu(null);
+                    deleteAdmin(a.id);
+                  }}
+                >
+                  Elimina definitivamente
+                </button>
+              </div>
+            }
+          </div>
+        )}
+      </div>)}
+    </div>
+}
+
       </section>}
 
       {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}<X size={15}/></div>}
