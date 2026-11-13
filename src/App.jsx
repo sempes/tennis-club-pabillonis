@@ -1545,7 +1545,10 @@ aria-label={
         <div className="admin-heading admin-subheading">
           <div>
             <span className="eyebrow">ELENCO SOCI</span>
-            <h2>Soci registrati</h2>
+<h2>Soci registrati</h2>
+<p className="muted">
+  Soci attivi: <b>{members.length}</b>
+</p>
           </div>
         </div>
 
