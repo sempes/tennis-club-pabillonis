@@ -1474,3 +1474,18 @@ button { cursor: pointer; }
     grid-row: 5;
   }
 }
+
+  /* Uniforma data e orari */
+  .event-form > input:nth-child(4),
+  .event-form > select:nth-child(6),
+  .event-form > select:nth-child(8) {
+    height: 52px;
+    padding: 0 14px;
+    border: 1px solid #dce5dc;
+    border-radius: 12px;
+    background-color: #f8faf8;
+    color: #203126;
+    font-family: inherit;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
