@@ -1397,3 +1397,49 @@ button { cursor: pointer; }
     font-size: 23px;
   }
 }
+
+/* GESTIONE EVENTI - IMPAGINAZIONE DESKTOP */
+@media (min-width: 701px) {
+  .event-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px 18px;
+    align-items: center;
+  }
+
+  .event-form > input:nth-child(1) {
+    grid-column: 1;
+  }
+
+  .event-form > textarea:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .event-form > label:nth-child(3),
+  .event-form > input:nth-child(4) {
+    grid-column: 1;
+  }
+
+  .event-form > label:nth-child(5),
+  .event-form > select:nth-child(6) {
+    grid-column: 1;
+  }
+
+  .event-form > label:nth-child(7),
+  .event-form > select:nth-child(8) {
+    grid-column: 2;
+  }
+
+  .event-form > label:nth-child(9) {
+    grid-column: 1;
+  }
+
+  .event-form > div:nth-child(10) {
+    grid-column: 2;
+  }
+
+  .event-form > button {
+    grid-column: 1 / -1 !important;
+  }
+}
