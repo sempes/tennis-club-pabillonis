@@ -1401,7 +1401,7 @@ aria-label={
 
         <h3>Organizza un nuovo evento</h3>
 
-        <form className="member-form" onSubmit={createEvent}>
+        <form className="member-form event-form" onSubmit={createEvent}>
           <input
             type="text"
             placeholder="Titolo dell'evento"
