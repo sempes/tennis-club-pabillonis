@@ -1267,3 +1267,25 @@ button { cursor: pointer; }
     height: 58px;
   }
 }
+
+/* SCORRIMENTO MENU LATERALE SU SCHERMI BASSI */
+@media (min-width: 701px) {
+  .sidebar {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .sidebar nav {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    align-content: start;
+    padding-right: 4px;
+  }
+
+  .sidebar-bottom {
+    flex-shrink: 0;
+  }
+}
