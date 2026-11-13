@@ -1403,35 +1403,55 @@ button { cursor: pointer; }
 @media (min-width: 701px) {
   .event-form {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 12px 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 16px;
     align-items: end;
   }
 
-  /* Titolo e descrizione */
+  /* Titolo e descrizione: stessa dimensione */
   .event-form > input:nth-child(1) {
     grid-column: 1;
     grid-row: 1;
+    height: 58px;
+    box-sizing: border-box;
   }
 
   .event-form > textarea:nth-child(2) {
     grid-column: 2 / 4;
     grid-row: 1;
+    height: 58px;
+    min-height: 58px;
+    box-sizing: border-box;
   }
 
-  /* Data */
+  /* Data, ora inizio e ora fine */
+  .event-form > label:nth-child(3),
+  .event-form > label:nth-child(5),
+  .event-form > label:nth-child(7) {
+    grid-row: 2;
+    align-self: end;
+    margin: 0;
+  }
+
+  .event-form > input:nth-child(4),
+  .event-form > select:nth-child(6),
+  .event-form > select:nth-child(8) {
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
   .event-form > label:nth-child(3),
   .event-form > input:nth-child(4) {
     grid-column: 1;
   }
 
-  /* Orario di inizio */
   .event-form > label:nth-child(5),
   .event-form > select:nth-child(6) {
     grid-column: 2;
   }
 
-  /* Orario di fine */
   .event-form > label:nth-child(7),
   .event-form > select:nth-child(8) {
     grid-column: 3;
@@ -1440,14 +1460,17 @@ button { cursor: pointer; }
   /* Campi da riservare */
   .event-form > label:nth-child(9) {
     grid-column: 1;
+    grid-row: 4;
   }
 
   .event-form > div:nth-child(10) {
     grid-column: 2 / 4;
+    grid-row: 4;
   }
 
   /* Pulsante */
   .event-form > button {
     grid-column: 1 / -1 !important;
+    grid-row: 5;
   }
 }
