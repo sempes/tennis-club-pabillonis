@@ -1333,3 +1333,67 @@ button { cursor: pointer; }
   color: #203126;
   white-space: nowrap;
 }
+
+/* RIEPILOGO SOCI */
+.member-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+  margin-bottom: 22px;
+}
+
+.member-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  background: #edf1e9;
+}
+
+.member-stat span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #52634c;
+}
+
+.member-stat b {
+  font-size: 27px;
+  font-weight: 800;
+  color: #20382e;
+}
+
+.member-stat:nth-child(2) {
+  background: #e8f3df;
+}
+
+.member-stat:nth-child(2) b {
+  color: #47743b;
+}
+
+.member-stat:nth-child(3) {
+  background: #fff1dc;
+}
+
+.member-stat:nth-child(3) b {
+  color: #9a6927;
+}
+
+@media (max-width: 500px) {
+  .member-stats {
+    gap: 7px;
+  }
+
+  .member-stat {
+    padding: 12px 8px;
+  }
+
+  .member-stat span {
+    font-size: 11px;
+  }
+
+  .member-stat b {
+    font-size: 23px;
+  }
+}
