@@ -224,6 +224,9 @@ const [savingEvent,setSavingEvent] = useState(false);
 });
   const [savingAdmin,setSavingAdmin] = useState(false);
   const [activeView,setActiveView] = useState('bookings');
+  const [regulation,setRegulation] = useState('');
+const [editingRegulation,setEditingRegulation] = useState(false);
+const [savingRegulation,setSavingRegulation] = useState(false);
   const [openMemberMenu,setOpenMemberMenu] = useState(null);
   const [newBooking,setNewBooking] = useState({
     court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']
@@ -275,6 +278,71 @@ const [savingEvent,setSavingEvent] = useState(false);
       setSelectedPlayerIndex(null);
     }
   },[session,recoveryMode]);
+
+  useEffect(() => {
+    if (!session || recoveryMode) return;
+
+    let cancelled = false;
+
+    async function loadRegulation() {
+      const { data, error } = await supabase
+        .from('club_regulations')
+        .select('content')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        setNotice('Errore caricamento regolamento: ' + error.message);
+        return;
+      }
+
+      setRegulation(data?.content || '');
+    }
+
+    loadRegulation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, recoveryMode]);
+
+  
+async function saveRegulation() {
+  if (!isAdmin || !session) return;
+
+  if (!regulation.trim()) {
+    setNotice('Il regolamento non può essere vuoto.');
+    return;
+  }
+
+  setSavingRegulation(true);
+  setNotice('');
+
+  try {
+    const { error } = await supabase
+      .from('club_regulations')
+      .update({
+        content: regulation,
+        updated_at: new Date().toISOString(),
+        updated_by: session.user.id
+      })
+      .eq('id', 1);
+
+    if (error) {
+      setNotice('Errore salvataggio regolamento: ' + error.message);
+      return;
+    }
+
+    setEditingRegulation(false);
+    setNotice('Regolamento aggiornato e pubblicato correttamente.');
+  } catch (error) {
+    setNotice('Errore salvataggio regolamento: ' + error.message);
+  } finally {
+    setSavingRegulation(false);
+  }
+}
 
   async function loadData(){
     if(!session) return;
@@ -1216,6 +1284,14 @@ async function deleteAdmin(id){
           <CalendarDays size={18}/> Prenotazioni
         </button>
 
+        
+<button type="button"
+  className={activeView==='regulation'?'nav-active nav-button':'nav-button'}
+  onClick={()=>setActiveView('regulation')}>
+  <BookOpen size={18}/> Regolamento
+</button>
+
+
         {isAdmin&&<button type="button"
           className={activeView==='members'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('members')}>
@@ -1390,6 +1466,85 @@ aria-label={
         </section>
       
       </>}
+
+      
+{activeView==='regulation'&&<section className="admin-panel">
+  <div className="admin-heading">
+    <div>
+      <span className="eyebrow">TENNIS CLUB PABILLONIS</span>
+      <h2>Il nostro regolamento</h2>
+      <p className="muted">
+        Le regole per vivere al meglio il nostro circolo.
+      </p>
+    </div>
+    <BookOpen size={28}/>
+  </div>
+
+  <div style={{
+    background:'#f8faf7',
+    border:'1px solid #e4e9e1',
+    borderRadius:'16px',
+    padding:'22px',
+    marginTop:'20px',
+    lineHeight:1.8,
+    fontSize:'15px',
+    color:'#26352b',
+    whiteSpace:'pre-wrap',
+    overflowWrap:'anywhere'
+  }}>
+    {editingRegulation && isAdmin
+      ? <textarea
+          value={regulation}
+          onChange={e=>setRegulation(e.target.value)}
+          rows={24}
+          style={{
+            width:'100%',
+            minHeight:'500px',
+            padding:'14px',
+            border:'1px solid #d5ddd2',
+            borderRadius:'10px',
+            fontSize:'15px',
+            lineHeight:1.8,
+            resize:'vertical',
+            fontFamily:'inherit',
+            boxSizing:'border-box'
+          }}
+        />
+      : regulation || 'Regolamento non disponibile.'
+    }
+  </div>
+
+  {isAdmin&&<div style={{
+    display:'flex',
+    gap:'12px',
+    flexWrap:'wrap',
+    marginTop:'20px'
+  }}>
+    {!editingRegulation
+      ? <button type="button" className="primary"
+          onClick={()=>setEditingRegulation(true)}>
+          <Pencil size={17}/> Modifica regolamento
+        </button>
+      : <>
+          <button type="button" className="primary"
+            onClick={saveRegulation}
+            disabled={savingRegulation}>
+            <Save size={17}/>
+            {savingRegulation?'Salvataggio...':'Salva e pubblica'}
+          </button>
+          <button type="button" className="password-button"
+            onClick={()=>setEditingRegulation(false)}>
+            Annulla
+          </button>
+        </>
+    }
+  </div>}
+
+  {notice&&<div className="notice" style={{marginTop:'16px'}}>
+    {notice}
+  </div>}
+</section>}
+
 
       {activeView==='events'&&isAdmin&&<section className="admin-panel">
         <div className="admin-heading">
