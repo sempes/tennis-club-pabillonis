@@ -2,7 +2,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
-  Sparkles, X, KeyRound, LockKeyhole, ChevronDown, Search
+  Sparkles, X, KeyRound, LockKeyhole, ChevronDown, Search,
+  BookOpen, Pencil, Save
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
