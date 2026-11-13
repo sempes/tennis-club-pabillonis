@@ -1546,9 +1546,22 @@ aria-label={
           <div>
             <span className="eyebrow">ELENCO SOCI</span>
 <h2>Soci registrati</h2>
-<p className="muted">
-  Soci attivi: <b>{members.length}</b>
-</p>
+<div className="member-stats">
+  <div className="member-stat">
+    <span>Soci totali</span>
+    <b>{allMembers.filter(m=>m.status!=='deleted').length}</b>
+  </div>
+
+  <div className="member-stat">
+    <span>Soci attivi</span>
+    <b>{members.length}</b>
+  </div>
+
+  <div className="member-stat">
+    <span>Soci sospesi</span>
+    <b>{allMembers.filter(m=>m.status==='suspended').length}</b>
+  </div>
+</div>
           </div>
         </div>
 
