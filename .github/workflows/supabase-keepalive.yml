@@ -1,0 +1,43 @@
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '13 1 * * *'
+    - cron: '47 5 * * *'
+    - cron: '22 9 * * *'
+    - cron: '58 13 * * *'
+    - cron: '31 17 * * *'
+    - cron: '6 21 * * *''
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Random delay
+        run: |
+          DELAY=$((RANDOM % 1800))
+          echo "Attendo $DELAY secondi"
+          sleep "$DELAY"
+
+      - name: Check Supabase database
+        env:
+          SUPABASE_URL: https://wzofhptxcbsmqbxujuhp.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Errore: SUPABASE_ANON_KEY non configurata"
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 30 \
+            "$SUPABASE_URL/rest/v1/rpc/is_active_member" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
