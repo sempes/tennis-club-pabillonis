@@ -8,7 +8,7 @@ on:
     - cron: '22 9 * * *'
     - cron: '58 13 * * *'
     - cron: '31 17 * * *'
-    - cron: '6 21 * * *''
+    - cron: '6 21 * * *'
   workflow_dispatch:
 
 permissions:
@@ -39,5 +39,4 @@ jobs:
           curl --fail-with-body --silent --show-error \
             --max-time 30 \
             "$SUPABASE_URL/rest/v1/rpc/is_active_member" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+            -H "apikey: $SUPABASE_ANON_KEY"
