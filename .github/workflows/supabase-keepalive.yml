@@ -8,7 +8,8 @@ on:
     - cron: '22 9 * * *'
     - cron: '58 13 * * *'
     - cron: '31 17 * * *'
-    - cron: '6 21 * * *'
+    - cron: "6 21 * * *"
+    
   workflow_dispatch:
 
 permissions:
