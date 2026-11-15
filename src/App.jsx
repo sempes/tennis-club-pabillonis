@@ -931,21 +931,24 @@ function eventAt(c,t){
       return;
     }
 
-    setSavingAdminBooking(true);
-    const {error}=await supabase.rpc('create_booking_admin',{
+    const rpcArgs={
       p_court_id:Number(adminBooking.court_id),
       p_booking_date:selectedDate,
       p_start_time:adminBooking.time,
       p_booking_type:adminBooking.type,
       p_players:participants
-    });
+    };
+
+    console.log('PARAMETRI PRENOTAZIONE AMMINISTRATIVA:', rpcArgs);
+    setSavingAdminBooking(true);
+    const {error}=await supabase.rpc('create_booking_admin',rpcArgs);
     setSavingAdminBooking(false);
 
     if(error){
       const message=error.message||'Errore non specificato da Supabase';
-      console.error('ERRORE PRENOTAZIONE AMMINISTRATIVA:', error);
-      // Diagnostica temporanea: mostra il messaggio originale restituito da Supabase.
-      setNotice('Errore SQL prenotazione amministrativa: ' + message);
+      console.error('ERRORE PRENOTAZIONE AMMINISTRATIVA:', error, rpcArgs);
+      // Diagnostica temporanea: mostra errore SQL e parametri effettivamente inviati.
+      setNotice(`Errore SQL: ${message} | Campo ID: ${rpcArgs.p_court_id} | Data: ${rpcArgs.p_booking_date} | Ora: ${rpcArgs.p_start_time} | Tipo: ${rpcArgs.p_booking_type}`);
       return;
     }
 
