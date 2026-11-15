@@ -893,11 +893,6 @@ function eventAt(c,t){
     e.preventDefault();
     if(!isAdmin || savingAdminBooking) return;
 
-    if(!availableAdminBookingHours.includes(adminBooking.time)){
-      setNotice('L’orario selezionato non è più disponibile. Scegli un altro orario.');
-      return;
-    }
-
     const count=adminBooking.type==='singles'?2:4;
     const picked=adminBooking.players.slice(0,count);
     const guestAllowed=adminBooking.type==='singles'?[1]:[2,3];
