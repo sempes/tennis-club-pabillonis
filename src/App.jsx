@@ -222,6 +222,11 @@ const [savingEvent,setSavingEvent] = useState(false);
   const [recoveryPassword,setRecoveryPassword] = useState('');
   const [confirmRecoveryPassword,setConfirmRecoveryPassword] = useState('');
   const [showBooking,setShowBooking] = useState(false);
+  const [showAdminBooking,setShowAdminBooking] = useState(false);
+  const [savingAdminBooking,setSavingAdminBooking] = useState(false);
+  const [adminBooking,setAdminBooking] = useState({
+    court_id:'1',time:'09:00',type:'singles',players:['','','',''],guests:['','','','']
+  });
   const [showPassword,setShowPassword] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
   const [selectedEvent,setSelectedEvent] = useState(null);
@@ -648,6 +653,35 @@ const availableBookingHours = useMemo(() => {
   newBooking.type
 ]);
 
+const availableAdminBookingHours = useMemo(() => {
+  const now = new Date();
+  const nowAbsolute = dateToDayNumber(dateKey(now)) * 1440 + now.getHours() * 60 + now.getMinutes();
+  const selectedDayAbsolute = dateToDayNumber(selectedDate) * 1440;
+  const duration = adminBooking.type === 'doubles' ? 120 : 60;
+
+  return hours.filter(h => {
+    const candidateStart = selectedDayAbsolute + timeToMinutes(h);
+    const candidateEnd = candidateStart + duration;
+    if (candidateStart <= nowAbsolute) return false;
+
+    const occupied = bookings.some(b => {
+      if (b.status !== 'active' || String(b.court_id) !== String(adminBooking.court_id)) return false;
+      return candidateStart < bookingEndAbsolute(b) && candidateEnd > bookingStartAbsolute(b);
+    });
+
+    const occupiedByEvent = events.some(event => {
+      if (event.status !== 'active') return false;
+      const eventCourts = (event.event_courts || []).map(ec => String(ec.court_id));
+      if (!eventCourts.includes(String(adminBooking.court_id))) return false;
+      const eventStart = dateToDayNumber(event.event_date) * 1440 + timeToMinutes(event.start_time);
+      const eventEnd = dateToDayNumber(event.event_date) * 1440 + timeToMinutes(event.end_time);
+      return candidateStart < eventEnd && candidateEnd > eventStart;
+    });
+
+    return !occupied && !occupiedByEvent;
+  });
+}, [bookings, events, selectedDate, adminBooking.court_id, adminBooking.type]);
+
   /*
    * Se si cambia campo oppure un orario non è più disponibile,
    * seleziona automaticamente il primo orario libero.
@@ -684,11 +718,10 @@ const busyMemberIds = useMemo(() => {
   });
 
   return new Set(
-    busyBookings.flatMap(b =>
-      (b.booking_players || [])
-        .map(p => p.member_id)
-        .filter(Boolean)
-    )
+    busyBookings.flatMap(b => [
+      b.owner_id,
+      ...(b.booking_players || []).map(p => p.member_id)
+    ].filter(Boolean))
   );
 }, [bookings]);
 
@@ -853,6 +886,83 @@ function eventAt(c,t){
     setNotice('Prenotazione confermata!');
     setShowBooking(false);
     setSelectedPlayerIndex(null);
+    await loadData();
+  }
+
+  async function createAdminBooking(e){
+    e.preventDefault();
+    if(!isAdmin || savingAdminBooking) return;
+
+    if(!availableAdminBookingHours.includes(adminBooking.time)){
+      setNotice('L’orario selezionato non è più disponibile. Scegli un altro orario.');
+      return;
+    }
+
+    const count=adminBooking.type==='singles'?2:4;
+    const picked=adminBooking.players.slice(0,count);
+    const guestAllowed=adminBooking.type==='singles'?[1]:[2,3];
+
+    if(!picked[0] || picked[0]==='guest'){
+      setNotice('Il primo giocatore deve essere un socio e sarà l’intestatario della prenotazione.');
+      return;
+    }
+    if(picked.some((x,i)=>x==='guest'&&!guestAllowed.includes(i))){
+      setNotice('Un ospite esterno non può occupare questa posizione.');
+      return;
+    }
+    if(picked.some(x=>!x)){
+      setNotice('Seleziona tutti i giocatori o indica gli ospiti.');
+      return;
+    }
+
+    const memberIds=picked.filter(x=>x!=='guest');
+    if(new Set(memberIds).size!==memberIds.length){
+      setNotice('Lo stesso socio non può essere selezionato più di una volta.');
+      return;
+    }
+
+    const participants=picked.map((id,i)=>{
+      const member=members.find(m=>m.id===id);
+      const guest=adminBooking.guests[i]?.trim();
+      return member
+        ? {member_id:member.id,display_name:member.full_name}
+        : id==='guest'
+          ? {member_id:null,display_name:guest}
+          : {member_id:null,display_name:''};
+    });
+
+    if(participants.some(p=>!p.display_name)){
+      setNotice('Inserisci nome e cognome degli ospiti.');
+      return;
+    }
+
+    setSavingAdminBooking(true);
+    const {error}=await supabase.rpc('create_booking_admin',{
+      p_court_id:Number(adminBooking.court_id),
+      p_booking_date:selectedDate,
+      p_start_time:adminBooking.time,
+      p_booking_type:adminBooking.type,
+      p_players:participants
+    });
+    setSavingAdminBooking(false);
+
+    if(error){
+      const message=error.message||'';
+      setNotice(
+        message.includes('member_already_booked')
+          ? 'Uno dei soci selezionati ha già una prenotazione attiva.'
+          : message.includes('slot_unavailable')
+            ? 'Questo orario è già occupato o bloccato da un evento.'
+            : message.includes('not_admin')
+              ? 'Non hai i permessi per effettuare questa operazione.'
+              : 'Non è stato possibile completare la prenotazione amministrativa. Verifica i dati e riprova.'
+      );
+      return;
+    }
+
+    setShowAdminBooking(false);
+    setAdminBooking({court_id:'1',time:'09:00',type:'singles',players:['','','',''],guests:['','','','']});
+    setNotice('Prenotazione amministrativa confermata.');
     await loadData();
   }
 
@@ -1461,6 +1571,17 @@ async function deleteAdmin(id){
             <button className={court==='1'?'filter active':''} onClick={()=>setCourt('1')}>Campo 1</button>
             <button className={court==='2'?'filter active':''} onClick={()=>setCourt('2')}>Campo 2</button>
           </div>
+          {isAdmin&&<button
+            type="button"
+            className="password-button"
+            onClick={()=>{
+              setNotice('');
+              setAdminBooking({court_id:court==='all'?'1':court,time:'09:00',type:'singles',players:['','','',''],guests:['','','','']});
+              setShowAdminBooking(true);
+            }}
+          >
+            <Plus size={17}/> Prenota per un socio
+          </button>}
           <button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
             <Plus size={17}/> Nuova prenotazione
           </button>
@@ -1488,7 +1609,7 @@ async function deleteAdmin(id){
                 return (
                   <div
                     key={t}
-                    className={`slot ${b?'occupied':ev?'event-occupied':''} ${past?'past':''}`}
+                    className={`slot ${b?'occupied':ev?'event-occupied':''} ${past?'past':''} ${b?.created_by?'admin-created':''}`}
                     onClick={b
   ? ()=>setSelectedBooking(b)
   : ev
@@ -1504,7 +1625,10 @@ tabIndex={b||ev?0:undefined}
     else if(ev) setSelectedEvent(ev);
   }
 }:undefined}
-                    style={b||ev?{cursor:'pointer'}:undefined}
+                    style={b||ev?{
+                      cursor:'pointer',
+                      ...(b?.created_by?{background:'#dff1ff',borderColor:'#86c5e8',color:'#174b70'}:{})
+                    }:undefined}
 aria-label={
   b
     ? `Apri dettagli prenotazione delle ${t}`
@@ -1518,6 +1642,7 @@ aria-label={
   ? <div className="slot-info">
       <b>{playerNames(b)}</b>
       <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+      {b.created_by&&<small style={{fontWeight:700,color:'#17618f'}}>Prenotazione amministrativa</small>}
     </div>
   : ev
     ? <div className="slot-info event-info">
@@ -2282,6 +2407,101 @@ aria-label={
           <button className="primary wide" type="submit" disabled={savingPassword}>
             {savingPassword?'Aggiornamento…':'Salva nuova password'}
             <ArrowRight size={17}/>
+          </button>
+        </form>
+      </div>
+    </div>}
+
+    {showAdminBooking&&isAdmin&&<div className="modal-backdrop" onClick={()=>!savingAdminBooking&&setShowAdminBooking(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">PANNELLO AMMINISTRATORE</span>
+            <h2>Prenota per un socio.</h2>
+            <p className="muted" style={{margin:'6px 0 0'}}>Il primo socio selezionato sarà intestatario e giocatore. Tu risulterai come creatore.</p>
+          </div>
+          <button type="button" className="icon-button" onClick={()=>setShowAdminBooking(false)} disabled={savingAdminBooking}><X/></button>
+        </div>
+
+        <div style={{background:'#eaf5ff',border:'1px solid #c9e5f8',borderRadius:'12px',padding:'12px 14px',marginBottom:'18px',fontSize:'13px',color:'#174b70'}}>
+          Prenotazione amministrativa: sarà evidenziata in celeste nel calendario.
+        </div>
+
+        <form onSubmit={createAdminBooking}>
+          <label>Campo
+            <select value={adminBooking.court_id} onChange={e=>setAdminBooking({...adminBooking,court_id:e.target.value})}>
+              <option value="1">Campo 1</option>
+              <option value="2">Campo 2</option>
+            </select>
+          </label>
+
+          <label>Orario
+            <select
+              value={availableAdminBookingHours.includes(adminBooking.time)?adminBooking.time:''}
+              onChange={e=>setAdminBooking({...adminBooking,time:e.target.value})}
+              disabled={availableAdminBookingHours.length===0}
+              required
+            >
+              {availableAdminBookingHours.length===0
+                ? <option value="">Nessun orario disponibile</option>
+                : availableAdminBookingHours.map(h=><option key={h} value={h}>{h} – {`${pad((Number(h.slice(0,2))+(adminBooking.type==='doubles'?2:1))%24)}:00`}</option>)}
+            </select>
+          </label>
+
+          <label>Tipo di partita
+            <select value={adminBooking.type} onChange={e=>setAdminBooking({...adminBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
+              <option value="singles">Singolo · 2 giocatori</option>
+              <option value="doubles">Doppio · 4 giocatori</option>
+            </select>
+          </label>
+
+          <div className="player-fields">
+            <b>Giocatori</b>
+            {Array.from({length:adminBooking.type==='singles'?2:4},(_,i)=>{
+              const guestAllowed=adminBooking.type==='singles'?i===1:i>=2;
+              const selectedId=adminBooking.players[i];
+              const selectedMember=members.find(m=>m.id===selectedId);
+              const alreadySelected=adminBooking.players.filter(Boolean);
+              return <div className="player-row" key={i}>
+                <span>{i+1}</span>
+                <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
+                  <select
+                    value={selectedId}
+                    required
+                    onChange={e=>{
+                      const players=[...adminBooking.players];
+                      const guests=[...adminBooking.guests];
+                      players[i]=e.target.value;
+                      guests[i]='';
+                      setAdminBooking({...adminBooking,players,guests});
+                    }}
+                    style={{width:'100%',minHeight:'46px'}}
+                  >
+                    <option value="">Seleziona socio {i===0?'(intestatario)':''}</option>
+                    {members.filter(m=>!busyMemberIds.has(m.id)&&(!alreadySelected.includes(m.id)||m.id===selectedId)).map(m=><option key={m.id} value={m.id}>{surnameFirst(m.full_name)}</option>)}
+                    {guestAllowed&&<option value="guest">Ospite esterno</option>}
+                  </select>
+                  {selectedId==='guest'&&guestAllowed&&<input
+                    placeholder="Nome e cognome ospite"
+                    value={adminBooking.guests[i]||''}
+                    onChange={e=>{
+                      const guests=[...adminBooking.guests];
+                      guests[i]=e.target.value;
+                      setAdminBooking({...adminBooking,guests});
+                    }}
+                    required
+                  />}
+                  {i===0&&<small style={{color:'#557b42'}}>Questo socio sarà l’intestatario della prenotazione.</small>}
+                </div>
+              </div>;
+            })}
+          </div>
+
+          <div className="modal-note">
+            <Clock3 size={16}/> Prenotazione di {adminBooking.type==='doubles'?120:60} minuti · massimo 2 giorni in anticipo
+          </div>
+          <button className="primary wide" type="submit" disabled={savingAdminBooking||availableAdminBookingHours.length===0}>
+            {savingAdminBooking?'Salvataggio…':'Conferma prenotazione'} <ArrowRight size={17}/>
           </button>
         </form>
       </div>
