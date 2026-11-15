@@ -893,6 +893,13 @@ function eventAt(c,t){
     e.preventDefault();
     if(!isAdmin || savingAdminBooking) return;
 
+    // Legge l'orario direttamente dal menu al momento della conferma.
+    const selectedTime = e.currentTarget.elements.namedItem('admin-booking-time')?.value || adminBooking.time;
+    if(!availableAdminBookingHours.includes(selectedTime)){
+      setNotice('L’orario selezionato non è più disponibile. Scegli un altro orario.');
+      return;
+    }
+
     const count=adminBooking.type==='singles'?2:4;
     const picked=adminBooking.players.slice(0,count);
     const guestAllowed=adminBooking.type==='singles'?[1]:[2,3];
@@ -934,7 +941,7 @@ function eventAt(c,t){
     const rpcArgs={
       p_court_id:Number(adminBooking.court_id),
       p_booking_date:selectedDate,
-      p_start_time:adminBooking.time,
+      p_start_time:selectedTime,
       p_booking_type:adminBooking.type,
       p_players:participants
     };
@@ -2491,8 +2498,9 @@ aria-label={
 
           <label>Orario
             <select
+              name="admin-booking-time"
               value={availableAdminBookingHours.includes(adminBooking.time)?adminBooking.time:''}
-              onChange={e=>setAdminBooking({...adminBooking,time:e.target.value})}
+              onChange={e=>setAdminBooking(prev=>({...prev,time:e.target.value}))}
               disabled={availableAdminBookingHours.length===0}
               required
             >
