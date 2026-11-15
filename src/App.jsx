@@ -946,16 +946,21 @@ function eventAt(c,t){
       p_players:participants
     };
 
-    console.log('PARAMETRI PRENOTAZIONE AMMINISTRATIVA:', rpcArgs);
     setSavingAdminBooking(true);
     const {error}=await supabase.rpc('create_booking_admin',rpcArgs);
     setSavingAdminBooking(false);
 
     if(error){
-      const message=error.message||'Errore non specificato da Supabase';
-      console.error('ERRORE PRENOTAZIONE AMMINISTRATIVA:', error, rpcArgs);
-      // Diagnostica temporanea: mostra errore SQL e parametri effettivamente inviati.
-      setNotice(`Errore SQL: ${message} | Campo ID: ${rpcArgs.p_court_id} | Data: ${rpcArgs.p_booking_date} | Ora: ${rpcArgs.p_start_time} | Tipo: ${rpcArgs.p_booking_type}`);
+      const message=error.message||'';
+      setNotice(
+        message.includes('member_already_booked')
+          ? 'Uno dei soci selezionati ha già una prenotazione attiva.'
+          : message.includes('slot_unavailable')
+            ? 'Questo orario è già occupato o bloccato da un evento.'
+            : message.includes('not_admin')
+              ? 'Non hai i permessi per effettuare questa operazione.'
+              : 'Non è stato possibile completare la prenotazione amministrativa. Verifica i dati e riprova.'
+      );
       return;
     }
 
