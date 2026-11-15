@@ -1357,7 +1357,7 @@ async function deleteAdmin(id){
             {days.map((d,i)=><button key={i}
               onClick={()=>setSelectedDate(dateKey(d))}
               className={selectedDate===dateKey(d)?'date-tab selected':''}>
-              <small>{['OGGI','DOMANI','DOPO DOMANI'][i]}</small>
+              <small>{['OGGI','DOMANI','DOPODOMANI'][i]}</small>
               <b>{pad(d.getDate())}</b>
               <span>{d.toLocaleDateString('it-IT',{month:'short'})}</span>
               <span style={{
