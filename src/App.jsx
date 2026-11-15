@@ -17,6 +17,22 @@ const timeToMinutes = value => {
   const [hour='0', minute='0'] = String(value || '00:00').slice(0,5).split(':');
   return Number(hour) * 60 + Number(minute);
 };
+// Converte una data in un numero progressivo di giorni.
+// Permette di confrontare correttamente orari su date diverse.
+const dateToDayNumber = date => {
+  const [year, month, day] = date.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+// Inizio assoluto di una prenotazione in minuti.
+const bookingStartAbsolute = booking =>
+  dateToDayNumber(booking.booking_date) * 1440 +
+  timeToMinutes(booking.start_time);
+
+// Fine effettiva: 60 minuti per singolo, 120 per doppio.
+const bookingEndAbsolute = booking =>
+  bookingStartAbsolute(booking) +
+  (booking.booking_type === 'doubles' ? 120 : 60);
 
 /* VISUALIZZA IL COGNOME PRIMA DEL NOME */
 function surnameFirst(fullName = '') {
@@ -348,6 +364,8 @@ async function saveRegulation() {
     if(!session) return;
     setLoading(true);
 
+        const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
     const [
   {data:p,error:pe},
   {data:m,error:me},
@@ -357,7 +375,7 @@ async function saveRegulation() {
       supabase.from('profiles').select('*').eq('id',session.user.id).single(),
       supabase.from('profiles').select('id,full_name,email,status,role').order('full_name'),
       supabase.from('bookings').select('*,booking_players(*)')
-        .gte('booking_date',dateKey(new Date()))
+        .gte('booking_date',dateKey(yesterday))
         .order('booking_date').order('start_time'),
       supabase.from('events')
   .select('*,event_courts(court_id)')
@@ -525,11 +543,24 @@ if(ee) {
     setNotice('Password modificata correttamente.');
   }
 
-  const dayBookings=useMemo(
-    ()=>bookings.filter(b=>b.booking_date===selectedDate &&
-      (court==='all'||String(b.court_id)===court)),
-    [bookings,selectedDate,court]
-  );
+  const dayBookings = useMemo(() => {
+  const dayStart = dateToDayNumber(selectedDate) * 1440;
+  const dayEnd = dayStart + 1440;
+
+  return bookings.filter(b => {
+    if (
+      b.status !== 'active' ||
+      (court !== 'all' && String(b.court_id) !== court)
+    ) {
+      return false;
+    }
+
+    const bookingStart = bookingStartAbsolute(b);
+    const bookingEnd = bookingEndAbsolute(b);
+
+    return bookingStart < dayEnd && bookingEnd > dayStart;
+  });
+}, [bookings, selectedDate, court]);
 
   /*
    * ORARI PRENOTABILI:
@@ -538,47 +569,84 @@ if(ee) {
    * - esclude gli orari già prenotati;
    * - esclude gli orari già trascorsi se la data è oggi.
    */
-  const availableBookingHours=useMemo(()=>{
-  const now=new Date();
-  const isToday=selectedDate===dateKey(now);
-  const duration=newBooking.type==='doubles'?120:60;
+  
+const availableBookingHours = useMemo(() => {
+  const now = new Date();
 
-  return hours.filter(h=>{
-    const candidateStart=timeToMinutes(h);
-    const candidateEnd=candidateStart+duration;
+  const nowAbsolute =
+    dateToDayNumber(dateKey(now)) * 1440 +
+    now.getHours() * 60 +
+    now.getMinutes();
 
-    if(isToday && candidateStart<=now.getHours()*60+now.getMinutes()){
+  const selectedDayAbsolute =
+    dateToDayNumber(selectedDate) * 1440;
+
+  const duration = newBooking.type === 'doubles' ? 120 : 60;
+
+  return hours.filter(h => {
+    const candidateStart =
+      selectedDayAbsolute + timeToMinutes(h);
+
+    const candidateEnd = candidateStart + duration;
+
+    // Non permette di prenotare orari già trascorsi
+    if (candidateStart <= nowAbsolute) {
       return false;
     }
 
-    const occupied=bookings.some(b=>{
-      if(b.status!=='active' || b.booking_date!==selectedDate ||
-        String(b.court_id)!==String(newBooking.court_id)) return false;
+    // Controllo delle prenotazioni attive,
+    // comprese quelle iniziate il giorno precedente
+    const occupied = bookings.some(b => {
+      if (
+        b.status !== 'active' ||
+        String(b.court_id) !== String(newBooking.court_id)
+      ) {
+        return false;
+      }
 
-      const bookingStart=timeToMinutes(b.start_time);
-      let bookingEnd=timeToMinutes(b.end_time);
-      if(bookingEnd<=bookingStart) bookingEnd+=24*60;
+      const bookingStart = bookingStartAbsolute(b);
+      const bookingEnd = bookingEndAbsolute(b);
 
-      return candidateStart<bookingEnd && candidateEnd>bookingStart;
+      return (
+        candidateStart < bookingEnd &&
+        candidateEnd > bookingStart
+      );
     });
 
-    const occupiedByEvent=events.some(event=>{
-      if(event.status!=='active' || event.event_date!==selectedDate) return false;
+    // Controllo degli eventi attivi
+    const occupiedByEvent = events.some(event => {
+      if (event.status !== 'active') return false;
 
-      const eventCourts=(event.event_courts||[])
-        .map(ec=>String(ec.court_id));
+      const eventCourts = (event.event_courts || [])
+        .map(ec => String(ec.court_id));
 
-      if(!eventCourts.includes(String(newBooking.court_id))) return false;
+      if (!eventCourts.includes(String(newBooking.court_id))) {
+        return false;
+      }
 
-      const eventStart=timeToMinutes(event.start_time);
-      const eventEnd=timeToMinutes(event.end_time);
+      const eventStart =
+        dateToDayNumber(event.event_date) * 1440 +
+        timeToMinutes(event.start_time);
 
-      return candidateStart<eventEnd && candidateEnd>eventStart;
+      const eventEnd =
+        dateToDayNumber(event.event_date) * 1440 +
+        timeToMinutes(event.end_time);
+
+      return (
+        candidateStart < eventEnd &&
+        candidateEnd > eventStart
+      );
     });
 
     return !occupied && !occupiedByEvent;
   });
-},[bookings,events,selectedDate,newBooking.court_id,newBooking.type]);
+}, [
+  bookings,
+  events,
+  selectedDate,
+  newBooking.court_id,
+  newBooking.type
+]);
 
   /*
    * Se si cambia campo oppure un orario non è più disponibile,
@@ -599,30 +667,31 @@ if(ee) {
   },[showBooking,availableBookingHours,newBooking.time]);
 
   
+const busyMemberIds = useMemo(() => {
+  const now = new Date();
 
-const busyMemberIds=useMemo(()=>{
-  const now=new Date();
+  const nowAbsolute =
+    dateToDayNumber(dateKey(now)) * 1440 +
+    now.getHours() * 60 +
+    now.getMinutes();
 
-  const busyBookings=bookings.filter(b=>{
-    if(b.status!=='active') return false;
+  const busyBookings = bookings.filter(b => {
+    if (b.status !== 'active') return false;
 
-    const endTime=String(b.end_time).slice(0,5);
+    const bookingEnd = bookingEndAbsolute(b);
 
-    const bookingEnd=new Date(
-      `${b.booking_date}T${endTime}:00`
-    );
-
-    return bookingEnd>now;
+    return bookingEnd > nowAbsolute;
   });
 
   return new Set(
-    busyBookings.flatMap(b=>
-      (b.booking_players||[])
-        .map(p=>p.member_id)
+    busyBookings.flatMap(b =>
+      (b.booking_players || [])
+        .map(p => p.member_id)
         .filter(Boolean)
     )
   );
-},[bookings]);
+}, [bookings]);
+
 
   const availableMembers=useMemo(()=>{
     const search=memberSearch.trim().toLocaleLowerCase('it');
@@ -662,18 +731,29 @@ const busyMemberIds=useMemo(()=>{
 
     setNewBooking({...newBooking,players,guests});
   }
+  
+function bookingAt(c, t) {
+  const slotStart =
+    dateToDayNumber(selectedDate) * 1440 +
+    timeToMinutes(t);
 
-  function bookingAt(c,t){
-    const slotStart=timeToMinutes(t);
-    return dayBookings.find(b=>{
-      if(String(b.court_id)!==String(c) || b.status!=='active') return false;
-      const bookingStart=timeToMinutes(b.start_time);
-      let bookingEnd=timeToMinutes(b.end_time);
-      if(bookingEnd<=bookingStart) bookingEnd+=24*60;
-      return slotStart>=bookingStart && slotStart<bookingEnd;
-      
-    });
-  }
+  return bookings.find(b => {
+    if (
+      String(b.court_id) !== String(c) ||
+      b.status !== 'active'
+    ) {
+      return false;
+    }
+
+    const bookingStart = bookingStartAbsolute(b);
+    const bookingEnd = bookingEndAbsolute(b);
+
+    return (
+      slotStart >= bookingStart &&
+      slotStart < bookingEnd
+    );
+  });
+}
 function eventAt(c,t){
   const slotStart=timeToMinutes(t);
 
@@ -2313,7 +2393,7 @@ aria-label={
                 ? <option value="">Nessun orario disponibile</option>
                 : availableBookingHours.map(h=>(
                     <option key={h} value={h}>
-                      {h} – {`${pad((Number(h.slice(0,2))+1)%24)}:00`}
+                      {h} – {`${pad((Number(h.slice(0,2))+(newBooking.type==='doubles'?2:1))%24)}:00`}
                     </option>
                   ))
               }
@@ -2419,7 +2499,7 @@ aria-label={
           </div>
 
           <div className="modal-note">
-            <Clock3 size={16}/> Prenotazione di 60 minuti · massimo 2 giorni in anticipo
+            <Clock3 size={16}/> Prenotazione di {newBooking.type==='doubles'?120:60} minuti · massimo 2 giorni in anticipo
           </div>
           <button
             className="primary wide"
