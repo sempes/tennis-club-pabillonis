@@ -1586,9 +1586,9 @@ async function deleteAdmin(id){
           >
             <Plus size={17}/> Prenota per un socio
           </button>}
-          <button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
+          {!isAdmin&&<button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
             <Plus size={17}/> Nuova prenotazione
-          </button>
+          </button>}
         </div>
 
         <section className="courts-grid">
