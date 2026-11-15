@@ -2427,6 +2427,68 @@ aria-label={
           Prenotazione amministrativa: sarà evidenziata in celeste nel calendario.
         </div>
 
+        <div style={{
+          display:'flex',
+          alignItems:'center',
+          gap:'14px',
+          padding:'15px 17px',
+          marginBottom:'22px',
+          borderRadius:'16px',
+          background:'linear-gradient(135deg, #f1f6e9 0%, #e7f0dc 100%)',
+          border:'1px solid #e0ead6',
+          boxShadow:'0 4px 12px rgba(35,65,40,0.05)'
+        }}>
+          <div style={{
+            width:'48px',
+            height:'48px',
+            flexShrink:0,
+            display:'flex',
+            alignItems:'center',
+            justifyContent:'center',
+            borderRadius:'13px',
+            background:'#ffffff',
+            color:'#557b42',
+            boxShadow:'0 2px 7px rgba(35,65,40,0.08)'
+          }}>
+            <CalendarDays size={25}/>
+          </div>
+
+          <div style={{minWidth:0}}>
+            <div style={{
+              fontSize:'10px',
+              fontWeight:800,
+              letterSpacing:'1.5px',
+              color:'#71866b',
+              marginBottom:'4px'
+            }}>
+              GIORNO DELLA PARTITA
+            </div>
+
+            <div style={{
+              fontSize:'17px',
+              fontWeight:800,
+              color:'#193329',
+              textTransform:'capitalize',
+              lineHeight:1.3
+            }}>
+              {selected.toLocaleDateString('it-IT',{
+                weekday:'long',
+                day:'numeric',
+                month:'long',
+                year:'numeric'
+              })}
+            </div>
+
+            <div style={{
+              fontSize:'11px',
+              color:'#71866b',
+              marginTop:'3px'
+            }}>
+              Data selezionata nel calendario
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={createAdminBooking}>
           <label>Campo
             <select value={adminBooking.court_id} onChange={e=>setAdminBooking({...adminBooking,court_id:e.target.value})}>
