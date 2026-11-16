@@ -231,6 +231,7 @@ const [savingEvent,setSavingEvent] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
   const [selectedEvent,setSelectedEvent] = useState(null);
   const [selectedPlayerIndex,setSelectedPlayerIndex] = useState(null);
+  const [selectedAdminPlayerIndex,setSelectedAdminPlayerIndex] = useState(null);
   const [memberSearch,setMemberSearch] = useState('');
   const [newPassword,setNewPassword] = useState('');
   const [confirmPassword,setConfirmPassword] = useState('');
@@ -738,6 +739,20 @@ const busyMemberIds = useMemo(() => {
       .sort(sortBySurname);
   },[members,busyMemberIds,profile,memberSearch]);
 
+  const availableAdminMembers=useMemo(()=>{
+    const search=memberSearch.trim().toLocaleLowerCase('it');
+    const alreadySelected=adminBooking.players.filter(Boolean);
+
+    return members
+      .filter(m=>!busyMemberIds.has(m.id))
+      .filter(m=>!alreadySelected.includes(m.id))
+      .filter(m=>!search||
+        surnameFirst(m.full_name).toLocaleLowerCase('it').includes(search)||
+        String(m.full_name||'').toLocaleLowerCase('it').includes(search)
+      )
+      .sort(sortBySurname);
+  },[members,busyMemberIds,memberSearch,adminBooking.players]);
+
   function openPlayerSelector(index){
     setSelectedPlayerIndex(index);
     setMemberSearch('');
@@ -754,6 +769,32 @@ const busyMemberIds = useMemo(() => {
     setNewBooking({...newBooking,players,guests});
     setSelectedPlayerIndex(null);
     setMemberSearch('');
+  }
+
+  function openAdminPlayerSelector(index){
+    setSelectedAdminPlayerIndex(index);
+    setMemberSearch('');
+  }
+
+  function chooseAdminMember(memberId){
+    if(selectedAdminPlayerIndex===null) return;
+
+    const players=[...adminBooking.players];
+    const guests=[...adminBooking.guests];
+    players[selectedAdminPlayerIndex]=memberId;
+    guests[selectedAdminPlayerIndex]='';
+
+    setAdminBooking({...adminBooking,players,guests});
+    setSelectedAdminPlayerIndex(null);
+    setMemberSearch('');
+  }
+
+  function chooseAdminGuest(index){
+    const players=[...adminBooking.players];
+    const guests=[...adminBooking.guests];
+    players[index]='guest';
+    guests[index]='';
+    setAdminBooking({...adminBooking,players,guests});
   }
 
   function chooseGuest(index){
@@ -2528,26 +2569,56 @@ aria-label={
               const guestAllowed=adminBooking.type==='singles'?i===1:i>=2;
               const selectedId=adminBooking.players[i];
               const selectedMember=members.find(m=>m.id===selectedId);
-              const alreadySelected=adminBooking.players.filter(Boolean);
               return <div className="player-row" key={i}>
                 <span>{i+1}</span>
                 <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
-                  <select
-                    value={selectedId}
-                    required
-                    onChange={e=>{
-                      const players=[...adminBooking.players];
-                      const guests=[...adminBooking.guests];
-                      players[i]=e.target.value;
-                      guests[i]='';
-                      setAdminBooking({...adminBooking,players,guests});
+                  <button
+                    type="button"
+                    onClick={()=>openAdminPlayerSelector(i)}
+                    style={{
+                      width:'100%',
+                      minHeight:'46px',
+                      padding:'10px 12px',
+                      border:'1px solid #dce5dc',
+                      borderRadius:'10px',
+                      background:'#ffffff',
+                      color:selectedMember?'#193329':'#829087',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'space-between',
+                      gap:'10px',
+                      textAlign:'left',
+                      cursor:'pointer',
+                      fontSize:'14px'
                     }}
-                    style={{width:'100%',minHeight:'46px'}}
                   >
-                    <option value="">Seleziona socio {i===0?'(intestatario)':''}</option>
-                    {members.filter(m=>!busyMemberIds.has(m.id)&&(!alreadySelected.includes(m.id)||m.id===selectedId)).map(m=><option key={m.id} value={m.id}>{surnameFirst(m.full_name)}</option>)}
-                    {guestAllowed&&<option value="guest">Ospite esterno</option>}
-                  </select>
+                    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {selectedMember
+                        ? surnameFirst(selectedMember.full_name)
+                        : selectedId==='guest'
+                          ? 'Ospite esterno'
+                          : `Cerca e seleziona un socio${i===0?' (intestatario)':''}`}
+                    </span>
+                    <Search size={17}/>
+                  </button>
+                  {guestAllowed&&
+                    <button
+                      type="button"
+                      onClick={()=>chooseAdminGuest(i)}
+                      style={{
+                        justifySelf:'start',
+                        border:0,
+                        background:'transparent',
+                        color:'#557b42',
+                        padding:'3px 0',
+                        fontSize:'13px',
+                        fontWeight:600,
+                        cursor:'pointer'
+                      }}
+                    >
+                      {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
+                    </button>
+                  }
                   {selectedId==='guest'&&guestAllowed&&<input
                     placeholder="Nome e cognome ospite"
                     value={adminBooking.guests[i]||''}
@@ -2800,11 +2871,12 @@ aria-label={
     </div>}
 
     {/* FINESTRA RICERCA E SELEZIONE SOCI */}
-    {selectedPlayerIndex!==null&&
+    {(selectedPlayerIndex!==null||selectedAdminPlayerIndex!==null)&&
       <div
         className="modal-backdrop"
         onClick={()=>{
           setSelectedPlayerIndex(null);
+          setSelectedAdminPlayerIndex(null);
           setMemberSearch('');
         }}
         style={{zIndex:10000}}
@@ -2823,7 +2895,7 @@ aria-label={
         >
           <div className="modal-top">
             <div>
-              <span className="eyebrow">NUOVA PRENOTAZIONE</span>
+              <span className="eyebrow">{selectedAdminPlayerIndex!==null?'PANNELLO AMMINISTRATORE':'NUOVA PRENOTAZIONE'}</span>
               <h2>Seleziona socio.</h2>
             </div>
             <button
@@ -2831,6 +2903,7 @@ aria-label={
               className="icon-button"
               onClick={()=>{
                 setSelectedPlayerIndex(null);
+                setSelectedAdminPlayerIndex(null);
                 setMemberSearch('');
               }}
               aria-label="Chiudi selezione"
@@ -2873,7 +2946,7 @@ aria-label={
             color:'#829087',
             marginBottom:'9px'
           }}>
-            {availableMembers.length} soci disponibili
+            {(selectedAdminPlayerIndex!==null?availableAdminMembers:availableMembers).length} soci disponibili
           </div>
 
           <div style={{
@@ -2886,7 +2959,7 @@ aria-label={
             gap:'6px',
             paddingBottom:'8px'
           }}>
-            {availableMembers.length===0
+            {(selectedAdminPlayerIndex!==null?availableAdminMembers:availableMembers).length===0
               ? <div style={{
                   padding:'24px 12px',
                   textAlign:'center',
@@ -2896,11 +2969,11 @@ aria-label={
                   <br/>
                   Prova a modificare la ricerca.
                 </div>
-              : availableMembers.map(m=>(
+              : (selectedAdminPlayerIndex!==null?availableAdminMembers:availableMembers).map(m=>(
                   <button
                     type="button"
                     key={m.id}
-                    onClick={()=>chooseMember(m.id)}
+                    onClick={()=>selectedAdminPlayerIndex!==null?chooseAdminMember(m.id):chooseMember(m.id)}
                     style={{
                       display:'flex',
                       alignItems:'center',
