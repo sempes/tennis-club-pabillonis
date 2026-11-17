@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight, CalendarDays, Clock3, LogOut, Plus, ShieldCheck,
   Sparkles, X, KeyRound, LockKeyhole, ChevronDown, Search,
-  BookOpen, Pencil, Save
+  BookOpen, Pencil, Save, Bell, Pin, Trash2
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
@@ -187,6 +187,15 @@ function App() {
   const [adminProfiles,setAdminProfiles] = useState([]);
   const [bookings,setBookings] = useState([]);
   const [events,setEvents] = useState([]);
+  // Stato separato della bacheca: non modifica i dati delle prenotazioni.
+  const [announcements,setAnnouncements] = useState([]);
+  const [announcementReadIds,setAnnouncementReadIds] = useState([]);
+  const [selectedAnnouncement,setSelectedAnnouncement] = useState(null);
+  const [announcementForm,setAnnouncementForm] = useState({
+    title:'', content:'', category:'Avviso', is_pinned:false
+  });
+  const [editingAnnouncementId,setEditingAnnouncementId] = useState(null);
+  const [savingAnnouncement,setSavingAnnouncement] = useState(false);
   const [eventForm,setEventForm] = useState({
   title:'',
   description:'',
@@ -331,7 +340,46 @@ const [savingRegulation,setSavingRegulation] = useState(false);
   }, [session, recoveryMode]);
 
   
-async function saveRegulation() {
+// Caricamento e aggiornamento periodico della bacheca, separati dalle prenotazioni.
+  useEffect(() => {
+    if (!session || recoveryMode) {
+      setAnnouncements([]);
+      setAnnouncementReadIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshAnnouncements = async () => {
+      const [announcementResult, readResult] = await Promise.all([
+        supabase.from('announcements').select('*')
+          .order('is_pinned', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase.from('announcement_reads').select('announcement_id')
+          .eq('user_id', session.user.id)
+      ]);
+
+      if (cancelled) return;
+      if (announcementResult.error || readResult.error) {
+        console.error('Errore caricamento bacheca:', announcementResult.error || readResult.error);
+        return;
+      }
+      setAnnouncements(announcementResult.data || []);
+      setAnnouncementReadIds((readResult.data || []).map(row => row.announcement_id));
+    };
+
+    refreshAnnouncements();
+    const intervalId = window.setInterval(refreshAnnouncements, 60000);
+    const handleFocus = () => refreshAnnouncements();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [session?.user?.id, recoveryMode]);
+
+  async function saveRegulation() {
   if (!isAdmin || !session) return;
 
   if (!regulation.trim()) {
@@ -365,6 +413,102 @@ async function saveRegulation() {
     setSavingRegulation(false);
   }
 }
+
+  async function refreshAnnouncementsNow() {
+    if (!session) return;
+    const [announcementResult, readResult] = await Promise.all([
+      supabase.from('announcements').select('*')
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false }),
+      supabase.from('announcement_reads').select('announcement_id')
+        .eq('user_id', session.user.id)
+    ]);
+    if (!announcementResult.error) setAnnouncements(announcementResult.data || []);
+    if (!readResult.error) {
+      setAnnouncementReadIds((readResult.data || []).map(row => row.announcement_id));
+    }
+  }
+
+  async function openAnnouncement(item) {
+    setSelectedAnnouncement(item);
+    if (announcementReadIds.includes(item.id)) return;
+    const { error } = await supabase.from('announcement_reads').insert({
+      announcement_id: item.id,
+      user_id: session.user.id
+    });
+    if (!error || error.code === '23505') {
+      setAnnouncementReadIds(previous =>
+        previous.includes(item.id) ? previous : [...previous, item.id]
+      );
+    } else {
+      console.error('Errore registrazione lettura:', error);
+    }
+  }
+
+  function resetAnnouncementForm() {
+    setEditingAnnouncementId(null);
+    setAnnouncementForm({title:'', content:'', category:'Avviso', is_pinned:false});
+  }
+
+  function editAnnouncement(item) {
+    setEditingAnnouncementId(item.id);
+    setAnnouncementForm({
+      title:item.title || '',
+      content:item.content || '',
+      category:item.category || 'Avviso',
+      is_pinned:Boolean(item.is_pinned)
+    });
+  }
+
+  async function saveAnnouncement(e) {
+    e.preventDefault();
+    if (!isAdmin || profile?.status !== 'active' || savingAnnouncement) return;
+    const title = announcementForm.title.trim();
+    const content = announcementForm.content.trim();
+    if (!title || !content) {
+      setNotice('Inserisci il titolo e il testo dell’aggiornamento.');
+      return;
+    }
+
+    setSavingAnnouncement(true);
+    setNotice('');
+    const editing = Boolean(editingAnnouncementId);
+    const payload = {
+      title,
+      content,
+      category:announcementForm.category,
+      is_pinned:announcementForm.is_pinned,
+      updated_at:new Date().toISOString()
+    };
+    const result = editing
+      ? await supabase.from('announcements').update(payload).eq('id', editingAnnouncementId)
+      : await supabase.from('announcements').insert({
+          ...payload,
+          created_by:session.user.id
+        });
+    setSavingAnnouncement(false);
+
+    if (result.error) {
+      setNotice('Errore salvataggio aggiornamento: ' + result.error.message);
+      return;
+    }
+    resetAnnouncementForm();
+    setNotice(editing ? 'Aggiornamento modificato correttamente.' : 'Aggiornamento pubblicato correttamente.');
+    await refreshAnnouncementsNow();
+  }
+
+  async function deleteAnnouncement(item) {
+    if (!isAdmin || profile?.status !== 'active') return;
+    if (!confirm(`Vuoi eliminare l’aggiornamento “${item.title}”?`)) return;
+    const { error } = await supabase.from('announcements').delete().eq('id', item.id);
+    if (error) {
+      setNotice('Errore eliminazione aggiornamento: ' + error.message);
+      return;
+    }
+    if (selectedAnnouncement?.id === item.id) setSelectedAnnouncement(null);
+    setNotice('Aggiornamento eliminato.');
+    await refreshAnnouncementsNow();
+  }
 
   async function loadData(){
     if(!session) return;
@@ -1526,6 +1670,22 @@ async function deleteAdmin(id){
   <BookOpen size={18}/> Regolamento
 </button>
 
+        <button type="button"
+          className={activeView==='announcements'?'nav-active nav-button':'nav-button'}
+          onClick={()=>setActiveView('announcements')}>
+          <Bell size={18}/> Aggiornamenti
+          {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
+            <span style={{
+              marginLeft:'auto', minWidth:'20px', height:'20px', padding:'0 6px',
+              borderRadius:'20px', background:'#b94b3e', color:'#fff',
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              fontSize:'11px', fontWeight:800
+            }}>
+              {announcements.filter(item => !announcementReadIds.includes(item.id)).length}
+            </span>
+          }
+        </button>
+
 
         {isAdmin&&<button type="button"
           className={activeView==='members'?'nav-active nav-button':'nav-button'}
@@ -1565,7 +1725,24 @@ async function deleteAdmin(id){
           <h1>Il campo ti aspetta<span>.</span></h1>
         </div>
         <div className="top-actions">
-          <span className="live-dot">Sistema attivo</span>
+          <button type="button" className="password-button"
+             onClick={() => setActiveView('announcements')}
+             aria-label="Apri aggiornamenti" title="Aggiornamenti"
+             style={{position:'relative'}}>
+             <Bell size={18}/>
+             {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
+               <span style={{
+                 position:'absolute', top:'-6px', right:'-6px',
+                 minWidth:'18px', height:'18px', padding:'0 4px',
+                 borderRadius:'20px', background:'#b94b3e', color:'#fff',
+                 display:'flex', alignItems:'center', justifyContent:'center',
+                 fontSize:'10px', fontWeight:800, border:'2px solid #fff'
+               }}>
+                 {announcements.filter(item => !announcementReadIds.includes(item.id)).length}
+               </span>
+             }
+           </button>
+           <span className="live-dot">Sistema attivo</span>
           <button type="button" className="password-button"
             onClick={()=>{setNotice('');setShowPassword(true);}}>
             <KeyRound size={17}/> Cambia password
@@ -1718,6 +1895,113 @@ aria-label={
       </>}
 
       
+{activeView==='announcements'&&<section className="admin-panel">
+  <div className="admin-heading">
+    <div>
+      <span className="eyebrow">TENNIS CLUB PABILLONIS</span>
+      <h2>Aggiornamenti da amministratori</h2>
+      <p className="muted">Comunicazioni ufficiali del circolo.</p>
+    </div>
+    <Bell size={28}/>
+  </div>
+
+  {isAdmin&&profile?.status==='active'&&
+    <div style={{marginTop:'20px',padding:'18px',border:'1px solid #e1e8e1',
+      borderRadius:'16px',background:'#fbfcfa'}}>
+      <h3 style={{marginTop:0}}>
+        {editingAnnouncementId ? 'Modifica aggiornamento' : 'Pubblica un aggiornamento'}
+      </h3>
+      <form className="member-form" onSubmit={saveAnnouncement}>
+        <input type="text" placeholder="Titolo dell’aggiornamento"
+          value={announcementForm.title}
+          onChange={e=>setAnnouncementForm({...announcementForm,title:e.target.value})}
+          maxLength={140} required/>
+        <select value={announcementForm.category}
+          onChange={e=>setAnnouncementForm({...announcementForm,category:e.target.value})}>
+          <option value="Avviso">Avviso</option>
+          <option value="Importante">Importante</option>
+          <option value="Evento">Evento</option>
+          <option value="Manutenzione">Manutenzione</option>
+        </select>
+        <textarea placeholder="Scrivi il testo della comunicazione..."
+          value={announcementForm.content}
+          onChange={e=>setAnnouncementForm({...announcementForm,content:e.target.value})}
+          rows={5} required/>
+        <label style={{display:'flex',alignItems:'center',gap:'9px'}}>
+          <input type="checkbox" checked={announcementForm.is_pinned}
+            onChange={e=>setAnnouncementForm({...announcementForm,is_pinned:e.target.checked})}/>
+          Fissa in evidenza in cima alla bacheca
+        </label>
+        <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
+          <button className="primary" type="submit" disabled={savingAnnouncement}>
+            <Save size={16}/>
+            {savingAnnouncement ? 'Salvataggio…' : editingAnnouncementId ? 'Salva modifiche' : 'Pubblica aggiornamento'}
+          </button>
+          {editingAnnouncementId&&
+            <button type="button" className="password-button" onClick={resetAnnouncementForm}>
+              Annulla modifica
+            </button>}
+        </div>
+      </form>
+      <small className="muted" style={{display:'block',marginTop:'10px'}}>
+        La gestione degli allegati sarà configurata separatamente.
+      </small>
+    </div>}
+
+  <div className="admin-list" style={{marginTop:'22px'}}>
+    {announcements.length===0
+      ? <p className="muted">Non ci sono ancora aggiornamenti pubblicati.</p>
+      : announcements.map(item => {
+          const isRead = announcementReadIds.includes(item.id);
+          return <article key={item.id} style={{
+            padding:'16px',marginBottom:'12px',border:'1px solid #e1e8e1',
+            borderRadius:'14px',background:isRead?'#ffffff':'#f5f9f1',
+            display:'grid',gap:'9px'
+          }}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+              <span style={{
+                fontSize:'11px',fontWeight:800,textTransform:'uppercase',
+                letterSpacing:'.5px',padding:'5px 8px',borderRadius:'20px',
+                background:item.category==='Importante'?'#fff0e8':'#eaf2e4',
+                color:item.category==='Importante'?'#a33b32':'#557b42'
+              }}>{item.category}</span>
+              {item.is_pinned&&<span style={{display:'inline-flex',alignItems:'center',
+                gap:'4px',fontSize:'11px',fontWeight:700,color:'#557b42'}}>
+                <Pin size={13}/> In evidenza
+              </span>}
+              {!isRead&&<span style={{fontSize:'11px',fontWeight:800,color:'#a33b32'}}>NUOVO</span>}
+            </div>
+            <h3 style={{margin:0}}>{item.title}</h3>
+            <small style={{color:'#718078'}}>
+              {new Date(item.created_at).toLocaleDateString('it-IT',{
+                day:'numeric',month:'long',year:'numeric'
+              })}
+              {' · '}
+              {adminProfiles.find(admin => admin.id === item.created_by)?.full_name
+                || (item.created_by===session?.user?.id ? profile?.full_name : 'Amministrazione')}
+            </small>
+            <p style={{margin:0,whiteSpace:'pre-wrap',lineHeight:1.65,overflowWrap:'anywhere'}}>
+              {item.content.length>220 ? item.content.slice(0,220)+'…' : item.content}
+            </p>
+            <div style={{display:'flex',gap:'9px',alignItems:'center',flexWrap:'wrap'}}>
+              <button type="button" className="password-button"
+                onClick={()=>openAnnouncement(item)}>Leggi aggiornamento</button>
+              {isAdmin&&profile?.status==='active'&&<>
+                <button type="button" className="password-button"
+                  onClick={()=>editAnnouncement(item)}>
+                  <Pencil size={15}/> Modifica
+                </button>
+                <button type="button" className="password-button"
+                  onClick={()=>deleteAnnouncement(item)} style={{color:'#a33b32'}}>
+                  <Trash2 size={15}/> Elimina
+                </button>
+              </>}
+            </div>
+          </article>;
+        })}
+  </div>
+</section>}
+
 {activeView==='regulation'&&<section className="admin-panel">
   <div className="admin-heading">
     <div>
@@ -2217,6 +2501,36 @@ aria-label={
       {loading&&<div className="loading">Aggiornamento disponibilità…</div>}
       <ClabFooter/>
     </main>
+
+    {/* FINESTRA DETTAGLIO AGGIORNAMENTO */}
+    {selectedAnnouncement&&<div className="modal-backdrop"
+      onClick={()=>setSelectedAnnouncement(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}
+        style={{maxWidth:'620px',width:'calc(100% - 32px)'}}>
+        <div className="modal-top">
+          <div>
+            <span className="eyebrow">{selectedAnnouncement.category}</span>
+            <h2>{selectedAnnouncement.title}</h2>
+          </div>
+          <button type="button" className="icon-button"
+            onClick={()=>setSelectedAnnouncement(null)}
+            aria-label="Chiudi aggiornamento"><X/></button>
+        </div>
+        <small style={{color:'#718078'}}>
+          {new Date(selectedAnnouncement.created_at).toLocaleDateString('it-IT',{
+            weekday:'long',day:'numeric',month:'long',year:'numeric'
+          })}
+          {selectedAnnouncement.is_pinned ? ' · In evidenza' : ''}
+        </small>
+        <div style={{marginTop:'18px',padding:'18px',background:'#f8faf7',
+          border:'1px solid #e4e9e1',borderRadius:'14px',whiteSpace:'pre-wrap',
+          lineHeight:1.75,overflowWrap:'anywhere'}}>
+          {selectedAnnouncement.content}
+        </div>
+        <button type="button" className="primary wide" style={{marginTop:'18px'}}
+          onClick={()=>setSelectedAnnouncement(null)}>Chiudi</button>
+      </div>
+    </div>}
 
     {/* FINESTRA DETTAGLIO PRENOTAZIONE */}
     {selectedBooking&&<div
