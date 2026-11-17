@@ -196,6 +196,8 @@ function App() {
   });
   const [editingAnnouncementId,setEditingAnnouncementId] = useState(null);
   const [savingAnnouncement,setSavingAnnouncement] = useState(false);
+  const [announcementAttachment,setAnnouncementAttachment] = useState(null);
+  const [selectedAnnouncementAttachmentUrl,setSelectedAnnouncementAttachmentUrl] = useState('');
   const [eventForm,setEventForm] = useState({
   title:'',
   description:'',
@@ -431,6 +433,13 @@ const [savingRegulation,setSavingRegulation] = useState(false);
 
   async function openAnnouncement(item) {
     setSelectedAnnouncement(item);
+    setSelectedAnnouncementAttachmentUrl('');
+    if (item.attachment_path) {
+      const { data, error } = await supabase.storage
+        .from('announcement-attachments')
+        .createSignedUrl(item.attachment_path, 3600);
+      if (!error && data?.signedUrl) setSelectedAnnouncementAttachmentUrl(data.signedUrl);
+    }
     if (announcementReadIds.includes(item.id)) return;
     const { error } = await supabase.from('announcement_reads').insert({
       announcement_id: item.id,
@@ -448,6 +457,7 @@ const [savingRegulation,setSavingRegulation] = useState(false);
   function resetAnnouncementForm() {
     setEditingAnnouncementId(null);
     setAnnouncementForm({title:'', content:'', category:'Avviso', is_pinned:false});
+    setAnnouncementAttachment(null);
   }
 
   function editAnnouncement(item) {
@@ -458,6 +468,7 @@ const [savingRegulation,setSavingRegulation] = useState(false);
       category:item.category || 'Avviso',
       is_pinned:Boolean(item.is_pinned)
     });
+    setAnnouncementAttachment(null);
   }
 
   async function saveAnnouncement(e) {
@@ -470,14 +481,49 @@ const [savingRegulation,setSavingRegulation] = useState(false);
       return;
     }
 
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (announcementAttachment && !allowedTypes.includes(announcementAttachment.type)) {
+      setNotice('Formato non valido. Puoi allegare solo PDF, JPG o PNG.');
+      return;
+    }
+    if (announcementAttachment && announcementAttachment.size > 10 * 1024 * 1024) {
+      setNotice('Il file supera il limite massimo di 10 MB.');
+      return;
+    }
+
     setSavingAnnouncement(true);
     setNotice('');
     const editing = Boolean(editingAnnouncementId);
+    const previousItem = editing
+      ? announcements.find(item => item.id === editingAnnouncementId)
+      : null;
+    let attachmentPath = previousItem?.attachment_path || null;
+    let uploadedAttachmentPath = null;
+
+    if (announcementAttachment) {
+      const safeName = announcementAttachment.name
+        .normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '_');
+      uploadedAttachmentPath = `${session.user.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('announcement-attachments')
+        .upload(uploadedAttachmentPath, announcementAttachment, {
+          contentType: announcementAttachment.type,
+          upsert: false
+        });
+      if (uploadError) {
+        setSavingAnnouncement(false);
+        setNotice('Errore caricamento allegato: ' + uploadError.message);
+        return;
+      }
+      attachmentPath = uploadedAttachmentPath;
+    }
+
     const payload = {
       title,
       content,
       category:announcementForm.category,
       is_pinned:announcementForm.is_pinned,
+      attachment_path:attachmentPath,
       updated_at:new Date().toISOString()
     };
     const result = editing
@@ -489,11 +535,50 @@ const [savingRegulation,setSavingRegulation] = useState(false);
     setSavingAnnouncement(false);
 
     if (result.error) {
+      if (uploadedAttachmentPath) {
+        await supabase.storage.from('announcement-attachments').remove([uploadedAttachmentPath]);
+      }
       setNotice('Errore salvataggio aggiornamento: ' + result.error.message);
       return;
     }
+
+    if (uploadedAttachmentPath && previousItem?.attachment_path) {
+      await supabase.storage.from('announcement-attachments').remove([previousItem.attachment_path]);
+    }
     resetAnnouncementForm();
     setNotice(editing ? 'Aggiornamento modificato correttamente.' : 'Aggiornamento pubblicato correttamente.');
+    await refreshAnnouncementsNow();
+  }
+
+  async function removeAnnouncementAttachment(item) {
+    if (!isAdmin || profile?.status !== 'active' || !item?.attachment_path) return;
+    if (!confirm(`Vuoi eliminare soltanto il file allegato a “${item.title}”? L’annuncio resterà pubblicato.`)) return;
+
+    const { error: updateError } = await supabase
+      .from('announcements')
+      .update({ attachment_path: null, updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+
+    if (updateError) {
+      setNotice('Errore aggiornamento annuncio: ' + updateError.message);
+      return;
+    }
+
+    const { error: storageError } = await supabase.storage
+      .from('announcement-attachments')
+      .remove([item.attachment_path]);
+
+    if (storageError) {
+      setNotice('Il collegamento al file è stato rimosso, ma non è stato possibile eliminare il file da Storage: ' + storageError.message);
+    } else {
+      setNotice('Allegato eliminato. L’annuncio è rimasto pubblicato.');
+    }
+
+    if (selectedAnnouncement?.id === item.id) {
+      setSelectedAnnouncement({ ...selectedAnnouncement, attachment_path: null });
+      setSelectedAnnouncementAttachmentUrl('');
+    }
+    if (editingAnnouncementId === item.id) setAnnouncementAttachment(null);
     await refreshAnnouncementsNow();
   }
 
@@ -504,6 +589,9 @@ const [savingRegulation,setSavingRegulation] = useState(false);
     if (error) {
       setNotice('Errore eliminazione aggiornamento: ' + error.message);
       return;
+    }
+    if (item.attachment_path) {
+      await supabase.storage.from('announcement-attachments').remove([item.attachment_path]);
     }
     if (selectedAnnouncement?.id === item.id) setSelectedAnnouncement(null);
     setNotice('Aggiornamento eliminato.');
@@ -1932,6 +2020,25 @@ aria-label={
             onChange={e=>setAnnouncementForm({...announcementForm,is_pinned:e.target.checked})}/>
           Fissa in evidenza in cima alla bacheca
         </label>
+        <div style={{display:'grid',gap:'6px'}}>
+          <label htmlFor="announcement-attachment" style={{fontWeight:700}}>Allega un file (facoltativo)</label>
+          <input id="announcement-attachment" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            onChange={e=>setAnnouncementAttachment(e.target.files?.[0] || null)}/>
+          <small className="muted">
+            Formati consentiti: PDF, JPG e PNG. Dimensione massima: 10 MB.
+            {editingAnnouncementId && announcements.find(item=>item.id===editingAnnouncementId)?.attachment_path
+              ? ' Se non scegli un nuovo file, quello già allegato viene mantenuto.' : ''}
+          </small>
+          {editingAnnouncementId && announcements.find(item=>item.id===editingAnnouncementId)?.attachment_path &&
+            <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+              <small>È già presente un allegato.</small>
+              <button type="button" className="password-button"
+                onClick={()=>removeAnnouncementAttachment(announcements.find(item=>item.id===editingAnnouncementId))}>
+                <Trash2 size={15}/> Elimina solo allegato
+              </button>
+            </div>}
+          {announcementAttachment&&<small>File selezionato: {announcementAttachment.name}</small>}
+        </div>
         <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
           <button className="primary" type="submit" disabled={savingAnnouncement}>
             <Save size={16}/>
@@ -1943,9 +2050,6 @@ aria-label={
             </button>}
         </div>
       </form>
-      <small className="muted" style={{display:'block',marginTop:'10px'}}>
-        La gestione degli allegati sarà configurata separatamente.
-      </small>
     </div>}
 
   <div className="admin-list" style={{marginTop:'22px'}}>
@@ -2527,6 +2631,19 @@ aria-label={
           lineHeight:1.75,overflowWrap:'anywhere'}}>
           {selectedAnnouncement.content}
         </div>
+        {selectedAnnouncement.attachment_path&&<div style={{marginTop:'16px',padding:'14px',
+          border:'1px solid #e1e8e1',borderRadius:'12px',display:'grid',gap:'10px'}}>
+          <strong>Allegato</strong>
+          {selectedAnnouncementAttachmentUrl
+            ? <a href={selectedAnnouncementAttachmentUrl} target="_blank" rel="noopener noreferrer"
+                style={{fontWeight:700,color:'#1769aa',overflowWrap:'anywhere'}}>
+                Apri o scarica l’allegato
+              </a>
+            : <small className="muted">Caricamento allegato o accesso non disponibile.</small>}
+          {selectedAnnouncement.attachment_path.match(/\.(jpg|jpeg|png)$/i)&&selectedAnnouncementAttachmentUrl&&
+            <img src={selectedAnnouncementAttachmentUrl} alt="Allegato dell’aggiornamento"
+              style={{width:'100%',maxHeight:'360px',objectFit:'contain',borderRadius:'8px'}}/>}
+        </div>}
         <button type="button" className="primary wide" style={{marginTop:'18px'}}
           onClick={()=>setSelectedAnnouncement(null)}>Chiudi</button>
       </div>
