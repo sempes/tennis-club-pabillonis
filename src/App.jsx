@@ -2014,7 +2014,8 @@ aria-label={
         <textarea placeholder="Scrivi il testo della comunicazione..."
           value={announcementForm.content}
           onChange={e=>setAnnouncementForm({...announcementForm,content:e.target.value})}
-          rows={5} required/>
+          rows={5} required
+          style={{gridColumn:'1 / -1',width:'100%',minWidth:0,boxSizing:'border-box',minHeight:'140px'}}/>
         <label style={{display:'flex',alignItems:'center',gap:'9px'}}>
           <input type="checkbox" checked={announcementForm.is_pinned}
             onChange={e=>setAnnouncementForm({...announcementForm,is_pinned:e.target.checked})}/>
