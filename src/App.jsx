@@ -1747,21 +1747,23 @@ async function deleteAdmin(id){
       <nav>
         <button type="button"
           className={activeView==='bookings'?'nav-active nav-button':'nav-button'}
-          onClick={()=>setActiveView('bookings')}>
+          onClick={()=>setActiveView('bookings')} 
+          style={{height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',lineHeight:1.2,flexWrap:'nowrap'}}>
           <CalendarDays size={18}/> Prenotazioni
         </button>
 
         
 <button type="button"
   className={activeView==='regulation'?'nav-active nav-button':'nav-button'}
-  onClick={()=>setActiveView('regulation')}>
+  onClick={()=>setActiveView('regulation')} 
+          style={{height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',lineHeight:1.2,flexWrap:'nowrap'}}>
   <BookOpen size={18}/> Regolamento
 </button>
 
         <button type="button"
           className={activeView==='announcements'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('announcements')}
-          style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap'}}>
+          style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap',height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',padding:'10px 12px',lineHeight:1.2,flexWrap:'nowrap'}}>
           <Bell size={18} style={{flex:'0 0 auto'}}/>
           <span style={{whiteSpace:'nowrap'}}>Aggiornamenti</span>
           {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
@@ -1779,19 +1781,22 @@ async function deleteAdmin(id){
 
         {isAdmin&&<button type="button"
           className={activeView==='members'?'nav-active nav-button':'nav-button'}
-          onClick={()=>setActiveView('members')}>
+          onClick={()=>setActiveView('members')} 
+          style={{height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',lineHeight:1.2,flexWrap:'nowrap'}}>
           <ShieldCheck size={18}/> Gestione soci
         </button>}
 
         {isAdmin&&<button type="button"
   className={activeView==='events'?'nav-active nav-button':'nav-button'}
-  onClick={()=>setActiveView('events')}>
+  onClick={()=>setActiveView('events')} 
+          style={{height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',lineHeight:1.2,flexWrap:'nowrap'}}>
   <CalendarDays size={18}/> Gestione eventi
 </button>}
 
         {isSuperAdmin&&<button type="button"
           className={activeView==='admins'?'nav-active nav-button':'nav-button'}
-          onClick={()=>setActiveView('admins')}>
+          onClick={()=>setActiveView('admins')} 
+          style={{height:'50px',minHeight:'50px',maxHeight:'50px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',lineHeight:1.2,flexWrap:'nowrap'}}>
           <ShieldCheck size={18}/> Gestione amministratori
         </button>}
       </nav>
