@@ -1760,8 +1760,10 @@ async function deleteAdmin(id){
 
         <button type="button"
           className={activeView==='announcements'?'nav-active nav-button':'nav-button'}
-          onClick={()=>setActiveView('announcements')}>
-          <Bell size={18}/> Aggiornamenti
+          onClick={()=>setActiveView('announcements')}
+          style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap'}}>
+          <Bell size={18} style={{flex:'0 0 auto'}}/>
+          <span style={{whiteSpace:'nowrap'}}>Aggiornamenti</span>
           {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
             <span style={{
               marginLeft:'auto', minWidth:'20px', height:'20px', padding:'0 6px',
@@ -2016,12 +2018,12 @@ aria-label={
           onChange={e=>setAnnouncementForm({...announcementForm,content:e.target.value})}
           rows={5} required
           style={{gridColumn:'1 / -1',width:'100%',minWidth:0,boxSizing:'border-box',minHeight:'140px'}}/>
-        <label style={{display:'flex',alignItems:'center',gap:'9px'}}>
+        <label style={{display:'flex',alignItems:'center',gap:'9px',gridColumn:'1 / -1',width:'100%',minWidth:0}}>
           <input type="checkbox" checked={announcementForm.is_pinned}
             onChange={e=>setAnnouncementForm({...announcementForm,is_pinned:e.target.checked})}/>
           Fissa in evidenza in cima alla bacheca
         </label>
-        <div style={{display:'grid',gap:'6px'}}>
+        <div style={{display:'grid',gap:'8px',gridColumn:'1 / -1',width:'100%',minWidth:0}}>
           <label htmlFor="announcement-attachment" style={{fontWeight:700}}>Allega un file (facoltativo)</label>
           <input id="announcement-attachment" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
             onChange={e=>setAnnouncementAttachment(e.target.files?.[0] || null)}/>
@@ -2034,19 +2036,22 @@ aria-label={
             <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
               <small>È già presente un allegato.</small>
               <button type="button" className="password-button"
+                style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'8px',width:'auto',minWidth:0,minHeight:'38px',padding:'8px 14px',fontSize:'13px',lineHeight:1.2,flex:'0 0 auto'}}
                 onClick={()=>removeAnnouncementAttachment(announcements.find(item=>item.id===editingAnnouncementId))}>
                 <Trash2 size={15}/> Elimina solo allegato
               </button>
             </div>}
           {announcementAttachment&&<small>File selezionato: {announcementAttachment.name}</small>}
         </div>
-        <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
-          <button className="primary" type="submit" disabled={savingAnnouncement}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',flexWrap:'wrap',gridColumn:'1 / -1',width:'100%'}}>
+          <button className="primary" type="submit" disabled={savingAnnouncement}
+            style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'8px',width:'auto',minWidth:0,minHeight:'42px',padding:'10px 16px',fontSize:'14px',lineHeight:1.2,flex:'0 0 auto'}}>
             <Save size={16}/>
             {savingAnnouncement ? 'Salvataggio…' : editingAnnouncementId ? 'Salva modifiche' : 'Pubblica aggiornamento'}
           </button>
           {editingAnnouncementId&&
-            <button type="button" className="password-button" onClick={resetAnnouncementForm}>
+            <button type="button" className="password-button" onClick={resetAnnouncementForm}
+              style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'auto',minWidth:0,minHeight:'42px',padding:'10px 16px',fontSize:'14px',lineHeight:1.2,flex:'0 0 auto'}}>
               Annulla modifica
             </button>}
         </div>
