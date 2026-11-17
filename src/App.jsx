@@ -1763,7 +1763,7 @@ async function deleteAdmin(id){
         <button type="button"
           className={activeView==='announcements'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('announcements')}
-          style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap',height:'auto',minHeight:'42px',boxSizing:'border-box',padding:'8px 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap'}}>
+          style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap',height:'42px',minHeight:'42px',maxHeight:'42px',boxSizing:'border-box',padding:'0 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap',overflow:'hidden'}}>
           <Bell size={18} style={{flex:'0 0 auto'}}/>
           <span style={{whiteSpace:'nowrap'}}>Aggiornamenti</span>
           {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
