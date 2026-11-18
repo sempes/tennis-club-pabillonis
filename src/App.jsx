@@ -312,6 +312,63 @@ const [savingRegulation,setSavingRegulation] = useState(false);
     }
   },[session,recoveryMode]);
 
+  // Aggiornamento in tempo reale delle prenotazioni e dei relativi partecipanti.
+  // La sottoscrizione è separata dal caricamento iniziale e non modifica le regole di prenotazione.
+  useEffect(() => {
+    if (!session || recoveryMode) return;
+
+    let refreshTimer = null;
+    let disposed = false;
+
+    const refreshBookingsData = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      loadData();
+    };
+
+    const scheduleRefresh = () => {
+      if (disposed) return;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        refreshBookingsData();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel(`bookings-realtime-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        scheduleRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'booking_players' },
+        scheduleRefresh
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Supabase Realtime prenotazioni:', status);
+        }
+      });
+
+    const handleFocus = () => {
+      if (document.visibilityState !== 'hidden') scheduleRefresh();
+    };
+    const handleOnline = () => scheduleRefresh();
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      disposed = true;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, recoveryMode]);
+
   useEffect(() => {
     if (!session || recoveryMode) return;
 
