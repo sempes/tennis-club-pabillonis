@@ -2824,11 +2824,32 @@ aria-label={
                 🎾
               </div>
               <div style={{minWidth:0}}>
-                <b style={{display:'block',color:'#193329'}}>
-                  {surnameFirst(p.display_name)||`Giocatore ${i+1}`}
-                </b>
+                <div style={{
+                  display:'flex',
+                  alignItems:'center',
+                  gap:'7px',
+                  minWidth:0
+                }}>
+                  {p.member_id&&p.member_id===selectedBooking.owner_id&&
+                    <span
+                      title="Socio intestatario della prenotazione"
+                      aria-label="Socio intestatario della prenotazione"
+                      style={{
+                        width:'9px',
+                        height:'9px',
+                        flexShrink:0,
+                        borderRadius:'50%',
+                        background:'#557b42',
+                        display:'inline-block'
+                      }}
+                    />
+                  }
+                  <b style={{display:'block',color:'#193329'}}>
+                    {surnameFirst(p.display_name)||`Giocatore ${i+1}`}
+                  </b>
+                </div>
                 <small style={{color:'#829087'}}>
-                  Giocatore {i+1}
+                  {p.member_id ? `Giocatore ${i+1}` : 'Ospite'}
                 </small>
               </div>
             </div>
