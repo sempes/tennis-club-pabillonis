@@ -1999,10 +1999,18 @@ tabIndex={b||ev?0:undefined}
     else if(ev) setSelectedEvent(ev);
   }
 }:undefined}
-                    style={b||ev?{
-                      cursor:'pointer',
-                      ...(b?.created_by?{background:'#dff1ff',borderColor:'#86c5e8',color:'#174b70'}:{})
-                    }:undefined}
+                    style={{
+                      height:'76px',
+                      minHeight:'76px',
+                      maxHeight:'76px',
+                      boxSizing:'border-box',
+                      overflow:'hidden',
+                      alignSelf:'start',
+                      ...(b||ev?{
+                        cursor:'pointer',
+                        ...(b?.created_by?{background:'#dff1ff',borderColor:'#86c5e8',color:'#174b70'}:{})
+                      }:{})
+                    }}
 aria-label={
   b
     ? `Apri dettagli prenotazione delle ${t}`
@@ -2013,15 +2021,66 @@ aria-label={
                   >
                     <span>{t}</span>
                     {b
-  ? <div className="slot-info">
-      <b>{playerNames(b)}</b>
-      <small>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
-      {b.created_by&&<small style={{fontWeight:700,color:'#17618f'}}>Prenotazione amministrativa</small>}
+  ? <div className="slot-info" style={{
+      minWidth:0,
+      maxWidth:'100%',
+      maxHeight:'34px',
+      overflow:'hidden',
+      display:'flex',
+      flexDirection:'column',
+      gap:'2px'
+    }}>
+      <b style={{
+        display:'block',
+        minWidth:0,
+        maxWidth:'100%',
+        overflow:'hidden',
+        textOverflow:'ellipsis',
+        whiteSpace:'nowrap'
+      }}>{playerNames(b)}</b>
+      <small style={{
+        display:'block',
+        lineHeight:1.15,
+        overflow:'hidden',
+        textOverflow:'ellipsis',
+        whiteSpace:'nowrap'
+      }}>{b.booking_type==='singles'?'Singolo':'Doppio'}</small>
+      {b.created_by&&<small style={{
+        display:'block',
+        maxWidth:'calc(100% - 18px)',
+        fontWeight:700,
+        color:'#17618f',
+        fontSize:'8px',
+        lineHeight:1.1,
+        overflow:'hidden',
+        textOverflow:'ellipsis',
+        whiteSpace:'nowrap'
+      }}>Prenotazione amministrativa</small>}
     </div>
   : ev
-    ? <div className="slot-info event-info">
-        <b>{ev.title}</b>
-        <small>Evento</small>
+    ? <div className="slot-info event-info" style={{
+        minWidth:0,
+        maxWidth:'100%',
+        maxHeight:'34px',
+        overflow:'hidden',
+        display:'flex',
+        flexDirection:'column',
+        gap:'2px'
+      }}>
+        <b style={{
+          display:'block',
+          minWidth:0,
+          maxWidth:'100%',
+          overflow:'hidden',
+          textOverflow:'ellipsis',
+          whiteSpace:'nowrap'
+        }}>{ev.title}</b>
+        <small style={{
+          display:'block',
+          overflow:'hidden',
+          textOverflow:'ellipsis',
+          whiteSpace:'nowrap'
+        }}>Evento</small>
       </div>
     : <small>{past?'Passato':'Libero'}</small>
 }
