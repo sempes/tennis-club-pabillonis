@@ -1999,18 +1999,10 @@ tabIndex={b||ev?0:undefined}
     else if(ev) setSelectedEvent(ev);
   }
 }:undefined}
-                    style={{
-                      height:'76px',
-                      minHeight:'76px',
-                      maxHeight:'76px',
-                      boxSizing:'border-box',
-                      overflow:'hidden',
-                      alignSelf:'start',
-                      ...(b||ev?{
-                        cursor:'pointer',
-                        ...(b?.created_by?{background:'#dff1ff',borderColor:'#86c5e8',color:'#174b70'}:{})
-                      }:{})
-                    }}
+                    style={b||ev?{
+                      cursor:'pointer',
+                      ...(b?.created_by?{background:'#dff1ff',borderColor:'#86c5e8',color:'#174b70'}:{})
+                    }:undefined}
 aria-label={
   b
     ? `Apri dettagli prenotazione delle ${t}`
