@@ -1139,7 +1139,7 @@ function bookingAt(c, t) {
   return bookings.find(b => {
     if (
       String(b.court_id) !== String(c) ||
-      b.status !== 'active'
+      !['active', 'expired'].includes(b.status)
     ) {
       return false;
     }
@@ -2021,7 +2021,13 @@ async function deleteAdmin(id){
               {hours.map(t=>{
                 const b=bookingAt(c,t);
     const ev=eventAt(c,t);
-                const past=selectedDate===dateKey(new Date())&&t<=`${pad(new Date().getHours())}:00`;
+                const now = new Date();
+                const nowAbsolute = dateToDayNumber(dateKey(now)) * 1440 + now.getHours() * 60 + now.getMinutes();
+                const slotStartAbsolute = dateToDayNumber(selectedDate) * 1440 + timeToMinutes(t);
+                const slotEndAbsolute = b ? bookingEndAbsolute(b) : slotStartAbsolute;
+                const past = b
+                  ? slotEndAbsolute <= nowAbsolute
+                  : slotStartAbsolute <= nowAbsolute;
 
                 return (
                   <div
