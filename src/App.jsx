@@ -1177,10 +1177,23 @@ function eventAt(c,t){
   }
 
   function canCancelBooking(b){
-    return isAdmin ||
-      (b.booking_players||[]).some(p=>p.member_id===session?.user?.id);
-  }
+  // Amministratori e super amministratori mantengono i permessi attuali.
+  if (isAdmin) return true;
 
+  // Il socio deve partecipare alla prenotazione.
+  const isParticipant = (b.booking_players||[]).some(
+    p => p.member_id === session?.user?.id
+  );
+
+  if (!isParticipant) return false;
+
+  // Il socio può cancellare soltanto prima dell'inizio della partita.
+  const bookingStart = new Date(
+    `${b.booking_date}T${String(b.start_time).slice(0,5)}:00`
+  );
+
+  return bookingStart.getTime() > Date.now();
+}
   function canBook(){
     return profile?.status==='active';
   }
