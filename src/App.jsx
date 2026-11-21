@@ -2609,7 +2609,7 @@ aria-label={
           <div>
             <span className="eyebrow">AREA RISERVATA AMMINISTRATORI</span>
             <h2>Storico prenotazioni</h2>
-            <p className="muted">Registro delle prenotazioni create, cancellate e scadute dal 20 novembre 2026.</p>
+            <p className="muted">Registro delle prenotazioni create, cancellate e delle partite concluse dal 20 novembre 2026.</p>
           </div>
           <Clock3 size={28}/>
         </div>
@@ -2629,9 +2629,10 @@ aria-label={
               <option value="all">Tutti i soci</option>
               {[...new Set(bookingHistory.flatMap(item => {
                 const snap = item.booking_snapshot || {};
-                const players = Array.isArray(snap.players) ? snap.players : (Array.isArray(snap.participants) ? snap.participants : (Array.isArray(snap.booking_players) ? snap.booking_players : []));
-                const names = players.map(player => player?.display_name).filter(Boolean);
-                if (snap.owner_name) names.push(snap.owner_name);
+                const booking = snap.booking || snap;
+                const participants = Array.isArray(snap.participants) ? snap.participants : [];
+                const names = participants.map(player => player?.display_name).filter(Boolean);
+                if (booking.owner_name) names.push(booking.owner_name);
                 return names;
               }))].sort((a,b)=>a.localeCompare(b,'it')).map(name =>
                 <option key={name} value={name}>{name}</option>
@@ -2666,16 +2667,27 @@ aria-label={
                 const booking = snap.booking || snap;
                 const bookingDate = booking.booking_date || '';
                 const courtId = booking.court_id == null ? '' : String(booking.court_id);
-                const players = Array.isArray(snap.players) ? snap.players : (Array.isArray(snap.participants) ? snap.participants : (Array.isArray(snap.booking_players) ? snap.booking_players : []));
-                const names = players.map(player => player?.display_name).filter(Boolean);
-                if (snap.owner_name) names.push(snap.owner_name);
+                const participants = Array.isArray(snap.participants) ? snap.participants : [];
+                const names = participants.map(player => player?.display_name).filter(Boolean);
+                if (booking.owner_name) names.push(booking.owner_name);
                 const matchesDate = !historyDateFilter || bookingDate === historyDateFilter;
                 const matchesCourt = historyCourtFilter === 'all' || courtId === historyCourtFilter;
                 const matchesMember = historyMemberFilter === 'all' || names.includes(historyMemberFilter);
                 return matchesDate && matchesCourt && matchesMember;
               });
 
-              const eventLabels = { created:'Creata', cancelled:'Cancellata', expired:'Scaduta' };
+              const eventLabels = {
+                created:'Prenotazione creata',
+                cancelled:'Prenotazione cancellata',
+                expired:'Partita conclusa'
+              };
+
+              const formatDateTime = value => value
+                ? new Date(value).toLocaleString('it-IT', {
+                    day:'2-digit',month:'2-digit',year:'numeric',
+                    hour:'2-digit',minute:'2-digit'
+                  })
+                : 'Non disponibile';
 
               return filteredHistory.length === 0
                 ? <p className="muted">Nessun evento trovato con i filtri selezionati.</p>
@@ -2683,8 +2695,8 @@ aria-label={
                     {filteredHistory.map(item => {
                       const snap = item.booking_snapshot || {};
                       const booking = snap.booking || snap;
-                      const players = Array.isArray(snap.players) ? snap.players : (Array.isArray(snap.participants) ? snap.participants : (Array.isArray(snap.booking_players) ? snap.booking_players : []));
-                      const participantNames = players.map(player => player?.display_name).filter(Boolean);
+                      const participants = Array.isArray(snap.participants) ? snap.participants : [];
+                      const participantNames = participants.map(player => player?.display_name).filter(Boolean);
                       const bookingDate = booking.booking_date
                         ? new Date(`${booking.booking_date}T12:00:00`).toLocaleDateString('it-IT')
                         : 'Data non disponibile';
@@ -2693,25 +2705,33 @@ aria-label={
                       const courtLabel = booking.court_id ? `Campo ${booking.court_id}` : 'Campo non disponibile';
                       const typeLabel = booking.booking_type === 'doubles' ? 'Doppio' : 'Singolo';
                       const statusLabel = eventLabels[item.event_type] || item.event_type || 'Evento';
-                      const eventDate = new Date(item.occurred_at).toLocaleString('it-IT', {
-                        day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'
-                      });
+                      const ownerName = booking.owner_name || 'Non disponibile';
+                      const creatorName = booking.created_by_name || 'Non disponibile';
+                      const actorName = item.actor_name || (
+                        item.event_type === 'expired' ? 'Sistema automatico' : 'Non disponibile'
+                      );
 
                       return <article key={item.id} style={{
                         border:'1px solid #e2e8e3',borderRadius:'14px',padding:'16px',
-                        background:'#fff',display:'grid',gap:'8px'
+                        background:'#fff',display:'grid',gap:'9px'
                       }}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                           <strong>{statusLabel}</strong>
-                          <small className="muted">{eventDate}</small>
+                          <small className="muted">{formatDateTime(item.occurred_at)}</small>
                         </div>
                         <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
                           <b>{bookingDate}</b><span>·</span><span>{startTime || '--:--'}{endTime ? `–${endTime}` : ''}</span>
                           <span>·</span><span>{courtLabel}</span><span>·</span><span>{typeLabel}</span>
                         </div>
-                        <div><b>Prenotante:</b> {snap.owner_name || snap.created_by_name || 'Non disponibile'}</div>
+                        <div><b>Prenotante:</b> {ownerName}</div>
                         <div><b>Partecipanti:</b> {participantNames.length ? participantNames.join(', ') : 'Nessun nominativo salvato'}</div>
-                        <small className="muted">Registrato da: {item.actor_name || 'Sistema automatico / non disponibile'}</small>
+                        <small className="muted"><b>Creata il:</b> {formatDateTime(booking.created_at)}</small>
+                        <small className="muted"><b>Prenotazione inserita da:</b> {creatorName}</small>
+                        {item.event_type === 'cancelled' &&
+                          <small className="muted"><b>Cancellata il:</b> {formatDateTime(item.occurred_at)}</small>}
+                        {item.event_type === 'expired' &&
+                          <small className="muted"><b>Partita conclusa il:</b> {formatDateTime(item.occurred_at)}</small>}
+                        <small className="muted">Evento registrato da: {actorName}</small>
                         <small className="muted">ID prenotazione: {item.booking_id}</small>
                       </article>;
                     })}
