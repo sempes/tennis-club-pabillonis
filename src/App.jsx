@@ -2706,7 +2706,6 @@ aria-label={
                       const typeLabel = booking.booking_type === 'doubles' ? 'Doppio' : 'Singolo';
                       const statusLabel = eventLabels[item.event_type] || item.event_type || 'Evento';
                       const ownerName = booking.owner_name || 'Non disponibile';
-                      const creatorName = booking.created_by_name || 'Non disponibile';
                       const actorName = item.actor_name || (
                         item.event_type === 'expired' ? 'Sistema automatico' : 'Non disponibile'
                       );
@@ -2726,12 +2725,11 @@ aria-label={
                         <div><b>Prenotante:</b> {ownerName}</div>
                         <div><b>Partecipanti:</b> {participantNames.length ? participantNames.join(', ') : 'Nessun nominativo salvato'}</div>
                         <small className="muted"><b>Creata il:</b> {formatDateTime(booking.created_at)}</small>
-                        <small className="muted"><b>Prenotazione inserita da:</b> {creatorName}</small>
+                        <small className="muted"><b>Effettuata da:</b> {actorName}</small>
                         {item.event_type === 'cancelled' &&
                           <small className="muted"><b>Cancellata il:</b> {formatDateTime(item.occurred_at)}</small>}
                         {item.event_type === 'expired' &&
                           <small className="muted"><b>Partita conclusa il:</b> {formatDateTime(item.occurred_at)}</small>}
-                        <small className="muted">Evento registrato da: {actorName}</small>
                         <small className="muted">ID prenotazione: {item.booking_id}</small>
                       </article>;
                     })}
