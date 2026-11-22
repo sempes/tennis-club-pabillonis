@@ -2692,7 +2692,7 @@ aria-label={
                 if (booking.owner_name) names.push(booking.owner_name);
                 return names;
               }))].sort((a,b)=>surnameFirst(a).localeCompare(surnameFirst(b),'it',{sensitivity:'base'})).map(name =>
-                <option key={name} value={name} />
+                <option key={name} value={surnameFirst(name)} />
               )}
             </datalist>
           </label>
@@ -2740,7 +2740,7 @@ aria-label={
                 if (booking.owner_name) names.push(booking.owner_name);
                 const matchesDate = !historyDateFilter || bookingDate === historyDateFilter;
                 const matchesCourt = historyCourtFilter === 'all' || courtId === historyCourtFilter;
-                const matchesMember = historyMemberFilter === 'all' || names.some(name => String(name).toLocaleLowerCase('it').includes(historyMemberFilter.toLocaleLowerCase('it')));
+                const matchesMember = historyMemberFilter === 'all' || names.some(name => surnameFirst(name).toLocaleLowerCase('it').includes(historyMemberFilter.toLocaleLowerCase('it')));
                 const matchesType = historyTypeFilter === 'all' || item.event_type === historyTypeFilter;
                 return matchesDate && matchesCourt && matchesMember && matchesType;
               });
