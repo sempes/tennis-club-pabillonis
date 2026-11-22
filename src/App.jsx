@@ -2692,7 +2692,7 @@ aria-label={
                 if (booking.owner_name) names.push(booking.owner_name);
                 return names;
               }))].sort((a,b)=>surnameFirst(a).localeCompare(surnameFirst(b),'it',{sensitivity:'base'})).map(name =>
-                <option key={name} value={name} label={surnameFirst(name)} />
+                <option key={name} value={name} />
               )}
             </datalist>
           </label>
