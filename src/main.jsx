@@ -90,7 +90,7 @@ if ('serviceWorker' in navigator) {
 
       checkForUpdates();
 
-      window.setInterval(checkForUpdates, 60 * 60 * 1000);
+      window.setInterval(checkForUpdates, 60 * 1000);
       window.addEventListener('focus', checkForUpdates);
       window.addEventListener('online', checkForUpdates);
 
