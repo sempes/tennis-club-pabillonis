@@ -3885,20 +3885,6 @@ aria-label={
 >
   Chiudi
 </button>
-            style={{
-              width:'100%',
-              padding:'13px',
-              marginTop:'10px',
-              border:'1px solid #dce5dc',
-              borderRadius:'11px',
-              background:'#ffffff',
-              color:'#193329',
-              fontWeight:600,
-              cursor:'pointer'
-            }}
-          >
-            Chiudi
-          </button>
         </div>
       </div>
     }
