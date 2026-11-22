@@ -192,6 +192,9 @@ function App() {
   const [historyDateFilter,setHistoryDateFilter] = useState('');
   const [historyMemberFilter,setHistoryMemberFilter] = useState('all');
   const [historyCourtFilter,setHistoryCourtFilter] = useState('all');
+  const [historyTypeFilter,setHistoryTypeFilter] = useState('all');
+  const [expandedHistoryId,setExpandedHistoryId] = useState(null);
+  const [memberListSearch,setMemberListSearch] = useState('');
   const [historyError,setHistoryError] = useState('');
   const [events,setEvents] = useState([]);
   // Stato separato della bacheca: non modifica i dati delle prenotazioni.
@@ -2550,10 +2553,36 @@ aria-label={
           </div>
         </div>
 
+        <label style={{display:'grid',gap:'6px',margin:'12px 0 14px',fontWeight:600}}>
+          Cerca socio per nome o cognome
+          <input
+            type="search"
+            value={memberListSearch}
+            onChange={e=>setMemberListSearch(e.target.value)}
+            placeholder="Scrivi nome o cognome..."
+            style={{width:'100%',boxSizing:'border-box'}}
+          />
+        </label>
+
         <div className="admin-list">
           {allMembers.length===0
             ? <p className="muted">Nessun socio presente.</p>
-            : allMembers.map(m=><div className="admin-list-row" key={m.id}>
+            : allMembers.filter(m=>{
+                const search=memberListSearch.trim().toLocaleLowerCase('it');
+                return !search ||
+                  String(m.full_name||'').toLocaleLowerCase('it').includes(search) ||
+                  surnameFirst(m.full_name).toLocaleLowerCase('it').includes(search);
+              }).length===0
+              ? <p className="muted">Nessun socio corrisponde alla ricerca.</p>
+              : allMembers
+                  .filter(m=>{
+                    const search=memberListSearch.trim().toLocaleLowerCase('it');
+                    return !search ||
+                      String(m.full_name||'').toLocaleLowerCase('it').includes(search) ||
+                      surnameFirst(m.full_name).toLocaleLowerCase('it').includes(search);
+                  })
+                  .sort(sortBySurname)
+                  .map(m=><div className="admin-list-row" key={m.id}>
                 <div className="member-info" style={{
                   display:'flex',alignItems:'center',gap:'12px',minWidth:0
                 }}>
@@ -2672,6 +2701,17 @@ aria-label={
               <option value="2">Campo 2</option>
             </select>
           </label>
+          <label style={{display:'grid',gap:'6px',fontWeight:600}}>
+            Tipologia
+            <select value={historyTypeFilter}
+              onChange={e=>setHistoryTypeFilter(e.target.value)}
+              style={{width:'100%',boxSizing:'border-box'}}>
+              <option value="all">Tutte</option>
+              <option value="created">Prenotate</option>
+              <option value="cancelled">Cancellate</option>
+              <option value="expired">Concluse</option>
+            </select>
+          </label>
         </div>
 
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',flexWrap:'wrap',marginBottom:'14px'}}>
@@ -2696,13 +2736,14 @@ aria-label={
                 const matchesDate = !historyDateFilter || bookingDate === historyDateFilter;
                 const matchesCourt = historyCourtFilter === 'all' || courtId === historyCourtFilter;
                 const matchesMember = historyMemberFilter === 'all' || names.includes(historyMemberFilter);
-                return matchesDate && matchesCourt && matchesMember;
+                const matchesType = historyTypeFilter === 'all' || item.event_type === historyTypeFilter;
+                return matchesDate && matchesCourt && matchesMember && matchesType;
               });
 
               const eventLabels = {
-                created:'Prenotazione creata',
-                cancelled:'Prenotazione cancellata',
-                expired:'Partita conclusa'
+                created:'Prenotata',
+                cancelled:'Cancellata',
+                expired:'Conclusa'
               };
 
               const formatDateTime = value => value
@@ -2714,7 +2755,11 @@ aria-label={
 
               return filteredHistory.length === 0
                 ? <p className="muted">Nessun evento trovato con i filtri selezionati.</p>
-                : <div style={{display:'grid',gap:'12px'}}>
+                : <div style={{overflowX:'auto',border:'1px solid #e2e8e3',borderRadius:'12px',background:'#fff'}}>
+                    <div style={{minWidth:'850px'}}>
+                      <div style={{display:'grid',gridTemplateColumns:'110px 105px 110px 85px 85px minmax(150px,1fr) 145px 28px',gap:'10px',alignItems:'center',padding:'10px 14px',background:'#f5f8f5',borderBottom:'1px solid #e2e8e3',fontSize:'0.78rem',fontWeight:700,color:'#607168'}}>
+                        <span>Stato</span><span>Data partita</span><span>Orario</span><span>Campo</span><span>Tipo</span><span>Prenotante</span><span>Registrato il</span><span/>
+                      </div>
                     {filteredHistory.map(item => {
                       const snap = item.booking_snapshot || {};
                       const booking = snap.booking || snap;
@@ -2733,29 +2778,49 @@ aria-label={
                         item.event_type === 'expired' ? 'Sistema automatico' : 'Non disponibile'
                       );
 
-                      return <article key={item.id} style={{
-                        border:'1px solid #e2e8e3',borderRadius:'14px',padding:'16px',
-                        background:'#fff',display:'grid',gap:'9px'
-                      }}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                      const isExpanded = expandedHistoryId === item.id;
+                      const detailsId = `history-details-${item.id}`;
+
+                      return <article key={item.id} style={{borderBottom:'1px solid #edf1ed'}}>
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-controls={detailsId}
+                          onClick={()=>setExpandedHistoryId(isExpanded ? null : item.id)}
+                          style={{
+                            width:'100%',display:'grid',
+                            gridTemplateColumns:'110px 105px 110px 85px 85px minmax(150px,1fr) 145px 28px',
+                            gap:'10px',alignItems:'center',minWidth:'850px',
+                            padding:'12px 14px',border:0,background:'transparent',
+                            color:'inherit',textAlign:'left',cursor:'pointer',fontSize:'0.88rem'
+                          }}
+                        >
                           <strong>{statusLabel}</strong>
+                          <span>{bookingDate}</span>
+                          <span>{startTime || '--:--'}{endTime ? `–${endTime}` : ''}</span>
+                          <span>{courtLabel}</span>
+                          <span>{typeLabel}</span>
+                          <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ownerName}</span>
                           <small className="muted">{formatDateTime(item.occurred_at)}</small>
-                        </div>
-                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
-                          <b>{bookingDate}</b><span>·</span><span>{startTime || '--:--'}{endTime ? `–${endTime}` : ''}</span>
-                          <span>·</span><span>{courtLabel}</span><span>·</span><span>{typeLabel}</span>
-                        </div>
-                        <div><b>Prenotante:</b> {ownerName}</div>
-                        <div><b>Partecipanti:</b> {participantNames.length ? participantNames.join(', ') : 'Nessun nominativo salvato'}</div>
-                        <small className="muted"><b>Creata il:</b> {formatDateTime(booking.created_at)}</small>
-                        <small className="muted"><b>Effettuata da:</b> {actorName}</small>
-                        {item.event_type === 'cancelled' &&
-                          <small className="muted"><b>Cancellata il:</b> {formatDateTime(item.occurred_at)}</small>}
-                        {item.event_type === 'expired' &&
-                          <small className="muted"><b>Partita conclusa il:</b> {formatDateTime(item.occurred_at)}</small>}
-                        <small className="muted">ID prenotazione: {item.booking_id}</small>
+                          <ChevronDown size={16} style={{transform:isExpanded?'rotate(180deg)':'rotate(0deg)',transition:'transform .2s'}}/>
+                        </button>
+                        {isExpanded&&<div id={detailsId} style={{
+                          display:'grid',gap:'7px',padding:'0 14px 13px',
+                          borderTop:'1px solid #edf1ed',fontSize:'0.94rem'
+                        }}>
+                          <div style={{paddingTop:'10px'}}><b>Prenotante:</b> {ownerName}</div>
+                          <div><b>Partecipanti:</b> {participantNames.length ? participantNames.join(', ') : 'Nessun nominativo salvato'}</div>
+                          <small className="muted"><b>Creata il:</b> {formatDateTime(booking.created_at)}</small>
+                          <small className="muted"><b>Effettuata da:</b> {actorName}</small>
+                          {item.event_type === 'cancelled' &&
+                            <small className="muted"><b>Cancellata il:</b> {formatDateTime(item.occurred_at)}</small>}
+                          {item.event_type === 'expired' &&
+                            <small className="muted"><b>Partita conclusa il:</b> {formatDateTime(item.occurred_at)}</small>}
+                          <small className="muted">ID prenotazione: {item.booking_id}</small>
+                        </div>}
                       </article>;
                     })}
+                    </div>
                   </div>;
             })()}
       </section>}
