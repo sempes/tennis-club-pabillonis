@@ -15,30 +15,42 @@ if ('serviceWorker' in navigator) {
     window.dispatchEvent(new Event('tc-app-update-available'));
   };
 
+  const getAssets = (doc) => {
+    const scripts = [
+      ...doc.querySelectorAll('script[type="module"][src]')
+    ].map(el => el.getAttribute('src'));
+
+    const styles = [
+      ...doc.querySelectorAll('link[rel="stylesheet"][href]')
+    ].map(el => el.getAttribute('href'));
+
+    return [...scripts, ...styles].sort();
+  };
+
   const checkPublishedVersion = async () => {
     if (!navigator.onLine || updateAvailable) return;
 
     try {
-      const response = await fetch('/index.html', {
-        cache: 'no-store'
-      });
+      const response = await fetch(
+        `/index.html?version_check=${Date.now()}`,
+        { cache: 'no-store' }
+      );
 
       if (!response.ok) return;
 
       const html = await response.text();
+      const publishedDocument = new DOMParser().parseFromString(
+        html,
+        'text/html'
+      );
 
-      const currentScripts = [
-        ...document.querySelectorAll('script[type="module"][src]')
-      ].map(script => script.getAttribute('src'));
-
-      const publishedScripts = [
-        ...html.matchAll(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)["']/g)
-      ].map(match => match[1]);
+      const currentAssets = getAssets(document);
+      const publishedAssets = getAssets(publishedDocument);
 
       if (
-        currentScripts.length &&
-        publishedScripts.length &&
-        currentScripts.some(src => !publishedScripts.includes(src))
+        currentAssets.length &&
+        publishedAssets.length &&
+        JSON.stringify(currentAssets) !== JSON.stringify(publishedAssets)
       ) {
         notifyUpdateAvailable();
       }
@@ -79,9 +91,7 @@ if ('serviceWorker' in navigator) {
       checkForUpdates();
 
       window.setInterval(checkForUpdates, 60 * 60 * 1000);
-
       window.addEventListener('focus', checkForUpdates);
-
       window.addEventListener('online', checkForUpdates);
 
       window.addEventListener('tc-app-update-apply', () => {
