@@ -1,21 +1,56 @@
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './style.css';
 
-// Registrazione e gestione degli aggiornamenti della PWA.
+// Registrazione e gestione degli aggiornamenti PWA.
 if ('serviceWorker' in navigator) {
   let refreshing = false;
+  let updateAvailable = false;
 
   const notifyUpdateAvailable = () => {
+    if (updateAvailable) return;
+    updateAvailable = true;
     window.dispatchEvent(new Event('tc-app-update-available'));
+  };
+
+  const checkPublishedVersion = async () => {
+    if (!navigator.onLine || updateAvailable) return;
+
+    try {
+      const response = await fetch('/index.html', {
+        cache: 'no-store'
+      });
+
+      if (!response.ok) return;
+
+      const html = await response.text();
+
+      const currentScripts = [
+        ...document.querySelectorAll('script[type="module"][src]')
+      ].map(script => script.getAttribute('src'));
+
+      const publishedScripts = [
+        ...html.matchAll(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)["']/g)
+      ].map(match => match[1]);
+
+      if (
+        currentScripts.length &&
+        publishedScripts.length &&
+        currentScripts.some(src => !publishedScripts.includes(src))
+      ) {
+        notifyUpdateAvailable();
+      }
+    } catch (error) {
+      console.error('Controllo versione non riuscito:', error);
+    }
   };
 
   window.addEventListener('load', async () => {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js');
 
-      // Se una nuova versione è già in attesa, avvisa l'interfaccia.
       if (registration.waiting && navigator.serviceWorker.controller) {
         notifyUpdateAvailable();
       }
@@ -34,22 +69,28 @@ if ('serviceWorker' in navigator) {
         });
       });
 
-      // Controlla la presenza di una nuova versione all'avvio e al ritorno
-      // dell'utente nell'app; il controllo periodico evita verifiche continue.
-      registration.update().catch(() => {});
-      window.setInterval(() => {
-        if (navigator.onLine) registration.update().catch(() => {});
-      }, 60 * 60 * 1000);
+      const checkForUpdates = () => {
+        if (!navigator.onLine) return;
 
-      window.addEventListener('focus', () => {
-        if (navigator.onLine) registration.update().catch(() => {});
-      });
+        registration.update().catch(() => {});
+        checkPublishedVersion();
+      };
 
-      // L'attivazione viene richiesta soltanto quando l'utente preme Aggiorna.
+      checkForUpdates();
+
+      window.setInterval(checkForUpdates, 60 * 60 * 1000);
+
+      window.addEventListener('focus', checkForUpdates);
+
+      window.addEventListener('online', checkForUpdates);
+
       window.addEventListener('tc-app-update-apply', () => {
-        const waitingWorker = registration.waiting;
-        if (waitingWorker) {
-          waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        if (registration.waiting) {
+          registration.waiting.postMessage({
+            type: 'SKIP_WAITING'
+          });
+        } else if (updateAvailable) {
+          window.location.reload();
         }
       });
 
@@ -58,6 +99,7 @@ if ('serviceWorker' in navigator) {
         refreshing = true;
         window.location.reload();
       });
+
     } catch (error) {
       console.error('Errore Service Worker:', error);
     }
