@@ -1662,19 +1662,29 @@ async function deleteAdmin(id){
   setNotice('Amministratore eliminato definitivamente.');
   await loadData();
 }
-  async function revokeAdmin(id){
-    if(!confirm('Vuoi revocare i permessi di questo amministratore? Diventerà socio.')) return;
+  async function setAdminStatus(id, nextStatus){
+    const target=adminProfiles.find(a=>a.id===id);
+    if(!target) return;
+
+    const isSuspending=nextStatus==='suspended';
+    const actionLabel=isSuspending?'sospendere':'riattivare';
+    if(!confirm(`Vuoi ${actionLabel} ${target.full_name}?`)) return;
 
     const {data,error}=await supabase.functions.invoke('admin-manage-member',{
-      body:{action:'revoke_admin',member_id:id}
+      body:{
+        action:isSuspending?'suspend_admin':'reactivate_admin',
+        member_id:id
+      }
     });
 
     if(error||data?.error){
-      setNotice('Errore revoca amministratore: '+(data?.error||error?.message));
+      setNotice(`Errore: impossibile ${actionLabel} l'amministratore: `+(data?.error||error?.message));
       return;
     }
 
-    setNotice('Permessi amministratore revocati.');
+    setNotice(isSuspending
+      ? 'Amministratore sospeso. Il ruolo è rimasto invariato.'
+      : 'Amministratore riattivato correttamente.');
     await loadData();
   }
 
@@ -2834,7 +2844,7 @@ aria-label={
           </small>
         </div>
 
-        {a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
+        {a.id!==session?.user?.id && a.email?.toLowerCase()!=='andrea.cirronis@tiscali.it'&&(
           <div className="member-actions" style={{
             position:'relative',
             marginLeft:'auto',
@@ -2880,10 +2890,10 @@ aria-label={
                   }}
                   onClick={()=>{
                     setOpenMemberMenu(null);
-                    revokeAdmin(a.id);
+                    setAdminStatus(a.id, a.status==='active'?'suspended':'active');
                   }}
                 >
-                  Revoca amministratore
+                  {a.status==='active'?'Sospendi amministratore':'Riattiva amministratore'}
                 </button>
 
                 <button
