@@ -518,11 +518,13 @@ button { cursor: pointer; }
 }
 
 .slot.occupied {
-  background: #f1f5e9;
-  border-color: #dfe8d1;
+  background: #e4f2d8;
+  border-color: #c9e2b7;
 }
 
-.slot.occupied>span { color: #718b47; }
+.slot.occupied>span {
+  color: #56843c;
+}
 
 /* EVENTI DEL CLUB */
 .slot.event-occupied {
