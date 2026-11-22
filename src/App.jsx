@@ -222,6 +222,18 @@ const [savingEvent,setSavingEvent] = useState(false);
   const [loading,setLoading] = useState(false);
   const [notice,setNotice] = useState('');
   const [isOnline,setIsOnline] = useState(navigator.onLine);
+  const [updateAvailable,setUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+    const handleUpdateAvailable = () => setUpdateAvailable(true);
+    window.addEventListener('tc-app-update-available', handleUpdateAvailable);
+    return () => window.removeEventListener('tc-app-update-available', handleUpdateAvailable);
+  }, []);
+
+  function applyAppUpdate() {
+    window.dispatchEvent(new Event('tc-app-update-apply'));
+  }
+
   useEffect(() => {
   const handleOnline = () => setIsOnline(true);
   const handleOffline = () => setIsOnline(false);
@@ -1859,6 +1871,22 @@ async function deleteAdmin(id){
   </main>;
 
   return <div className="app-shell">
+    {updateAvailable && <div
+      role="status"
+      style={{
+        position:'fixed', top:'12px', left:'50%', transform:'translateX(-50%)',
+        zIndex:10000, width:'min(520px, calc(100% - 24px))',
+        background:'#123b2b', color:'#fff', padding:'12px 14px',
+        borderRadius:'12px', boxShadow:'0 8px 28px rgba(0,0,0,.22)',
+        display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px'
+      }}
+    >
+      <span style={{fontSize:'14px', lineHeight:1.35}}>È disponibile una nuova versione dell'app.</span>
+      <button type="button" onClick={applyAppUpdate} style={{
+        border:0, borderRadius:'8px', padding:'9px 12px', background:'#fff',
+        color:'#123b2b', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap'
+      }}>Aggiorna</button>
+    </div>}
     <aside className="sidebar">
       <Brand sidebar />
       <div className="club-label">TENNIS CLUB<br/><b>PABILLONIS</b></div>
