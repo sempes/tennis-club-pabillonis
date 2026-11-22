@@ -3866,9 +3866,7 @@ aria-label={
 
           <button
             type="button"
-            <button
-  type="button"
-  onClick={()=>{
+            onClick={()=>{
     setSelectedPlayerIndex(null);
     setSelectedAdminPlayerIndex(null);
     setMemberSearch('');
