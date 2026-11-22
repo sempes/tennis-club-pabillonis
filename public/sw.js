@@ -1,6 +1,5 @@
 
-
-const CACHE_NAME = 'tc-pabillonis-v1';
+const CACHE_NAME = 'tc-pabillonis-v2';
 
 const APP_SHELL = [
   '/',
@@ -14,7 +13,15 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
   );
-  self.skipWaiting();
+
+  // Non attiviamo subito la nuova versione:
+  // aspettiamo il comando dell'utente.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -22,29 +29,25 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key.startsWith('tc-pabillonis-') && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
+  if (
+    event.request.method !== 'GET' ||
+    url.origin !== self.location.origin
+  ) {
     return;
   }
 
-  
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
-
-  event.respondWith(fetch(event.request));
+  // Le richieste dell'app vengono sempre verificate online.
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });
-;
