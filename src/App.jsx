@@ -2675,10 +2675,15 @@ aria-label={
           </label>
           <label style={{display:'grid',gap:'6px',fontWeight:600}}>
             Socio / partecipante
-            <select value={historyMemberFilter}
-              onChange={e=>setHistoryMemberFilter(e.target.value)}
-              style={{width:'100%',boxSizing:'border-box'}}>
-              <option value="all">Tutti i soci</option>
+            <input
+              type="search"
+              list="history-member-options"
+              value={historyMemberFilter==='all'?'':historyMemberFilter}
+              onChange={e=>setHistoryMemberFilter(e.target.value.trim() || 'all')}
+              placeholder="Tutti i soci · cerca per nome o cognome..."
+              style={{width:'100%',boxSizing:'border-box'}}
+            />
+            <datalist id="history-member-options">
               {[...new Set(bookingHistory.flatMap(item => {
                 const snap = item.booking_snapshot || {};
                 const booking = snap.booking || snap;
@@ -2686,10 +2691,10 @@ aria-label={
                 const names = participants.map(player => player?.display_name).filter(Boolean);
                 if (booking.owner_name) names.push(booking.owner_name);
                 return names;
-              }))].sort((a,b)=>a.localeCompare(b,'it')).map(name =>
-                <option key={name} value={name}>{name}</option>
+              }))].sort((a,b)=>surnameFirst(a).localeCompare(surnameFirst(b),'it',{sensitivity:'base'})).map(name =>
+                <option key={name} value={name} label={surnameFirst(name)} />
               )}
-            </select>
+            </datalist>
           </label>
           <label style={{display:'grid',gap:'6px',fontWeight:600}}>
             Campo
@@ -2735,7 +2740,7 @@ aria-label={
                 if (booking.owner_name) names.push(booking.owner_name);
                 const matchesDate = !historyDateFilter || bookingDate === historyDateFilter;
                 const matchesCourt = historyCourtFilter === 'all' || courtId === historyCourtFilter;
-                const matchesMember = historyMemberFilter === 'all' || names.includes(historyMemberFilter);
+                const matchesMember = historyMemberFilter === 'all' || names.some(name => String(name).toLocaleLowerCase('it').includes(historyMemberFilter.toLocaleLowerCase('it')));
                 const matchesType = historyTypeFilter === 'all' || item.event_type === historyTypeFilter;
                 return matchesDate && matchesCourt && matchesMember && matchesType;
               });
