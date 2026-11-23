@@ -3667,28 +3667,32 @@ aria-label={
 
               return (
                 <div
-                  className="player-row"
                   key={i}
                   style={{
-                    display:'grid',
-                    gridTemplateColumns:'40px minmax(0, 1fr)',
-                    alignItems:'start',
-                    columnGap:'16px',
+                    display:'flex',
+                    flexDirection:'row',
+                    alignItems:'flex-start',
+                    gap:'16px',
                     width:'100%',
                     minWidth:0,
                     boxSizing:'border-box'
                   }}
                 >
-                  <span>{i+1}</span>
+                  <span style={{
+                    display:'block',
+                    flex:'0 0 40px',
+                    width:'40px',
+                    paddingTop:'12px',
+                    boxSizing:'border-box'
+                  }}>{i+1}</span>
 
                   <div style={{
-                    display:'grid',
-                    gridTemplateColumns:'minmax(0, 1fr)',
-                    alignContent:'start',
-                    justifyItems:'stretch',
+                    display:'flex',
+                    flexDirection:'column',
+                    alignItems:'stretch',
+                    flex:'1 1 0%',
                     minWidth:0,
-                    width:'100%',
-                    maxWidth:'100%',
+                    width:'0',
                     boxSizing:'border-box',
                     gap:'8px'
                   }}>
@@ -3705,10 +3709,11 @@ aria-label={
                         required
                         style={{
                           display:'block',
+                          flex:'1 1 auto',
                           width:'100%',
                           minWidth:0,
                           maxWidth:'100%',
-                          justifySelf:'stretch',
+                          alignSelf:'stretch',
                           boxSizing:'border-box',
                           minHeight:'46px',
                           padding:'10px 12px',
@@ -3760,7 +3765,11 @@ aria-label={
                           }
                         }}
                         style={{
-                          justifySelf:'start',
+                          alignSelf:'flex-start',
+                          display:'inline-block',
+                          whiteSpace:'nowrap',
+                          width:'max-content',
+                          maxWidth:'100%',
                           border:0,
                           background:'transparent',
                           color:'#557b42',
