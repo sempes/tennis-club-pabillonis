@@ -3666,17 +3666,30 @@ aria-label={
               const selectedMember=members.find(m=>m.id===selectedId);
 
               return (
-                <div className="player-row" key={i}>
+                <div
+                  className="player-row"
+                  key={i}
+                  style={{
+                    display:'grid',
+                    gridTemplateColumns:'40px minmax(0, 1fr)',
+                    alignItems:'start',
+                    columnGap:'16px',
+                    width:'100%',
+                    minWidth:0,
+                    boxSizing:'border-box'
+                  }}
+                >
                   <span>{i+1}</span>
 
                   <div style={{
-                    flex:'1 1 0%',
-                    minWidth:0,
-                    width:'100%',
-                    boxSizing:'border-box',
                     display:'grid',
                     gridTemplateColumns:'minmax(0, 1fr)',
+                    alignContent:'start',
                     justifyItems:'stretch',
+                    minWidth:0,
+                    width:'100%',
+                    maxWidth:'100%',
+                    boxSizing:'border-box',
                     gap:'8px'
                   }}>
                     {selectedId==='guest'&&guestAllowed ? (
