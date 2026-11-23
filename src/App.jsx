@@ -3726,10 +3726,6 @@ aria-label={
       : '＋ Inserisci ospite esterno'}
   </button>
 }
-                      >
-                        {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
-                      </button>
-                    }
 
                     {selectedId==='guest'&&guestAllowed&&
                       <input
