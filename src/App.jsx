@@ -3670,40 +3670,69 @@ aria-label={
                   <span>{i+1}</span>
 
                   <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
-                    <button
-                      type="button"
-                      onClick={()=>openPlayerSelector(i)}
-                      style={{
-                        width:'100%',
-                        minHeight:'46px',
-                        padding:'10px 12px',
-                        border:'1px solid #dce5dc',
-                        borderRadius:'10px',
-                        background:'#ffffff',
-                        color:selectedMember?'#193329':'#829087',
-                        display:'flex',
-                        alignItems:'center',
-                        justifyContent:'space-between',
-                        gap:'10px',
-                        textAlign:'left',
-                        cursor:'pointer',
-                        fontSize:'14px'
-                      }}
-                    >
-                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                        {selectedMember
-                          ? surnameFirst(selectedMember.full_name)
-                          : selectedId==='guest'
-                            ? 'Ospite esterno'
+                    {selectedId==='guest'&&guestAllowed ? (
+                      <input
+                        type="text"
+                        placeholder="Nome e cognome ospite"
+                        value={newBooking.guests[i]||''}
+                        onChange={e=>{
+                          const a=[...newBooking.guests];
+                          a[i]=e.target.value;
+                          setNewBooking({...newBooking,guests:a});
+                        }}
+                        required
+                        style={{
+                          width:'100%',
+                          minHeight:'46px',
+                          boxSizing:'border-box',
+                          padding:'10px 12px',
+                          border:'1px solid #dce5dc',
+                          borderRadius:'10px',
+                          background:'#ffffff',
+                          color:'#193329',
+                          fontSize:'14px'
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={()=>openPlayerSelector(i)}
+                        style={{
+                          width:'100%',
+                          minHeight:'46px',
+                          padding:'10px 12px',
+                          border:'1px solid #dce5dc',
+                          borderRadius:'10px',
+                          background:'#ffffff',
+                          color:selectedMember?'#193329':'#829087',
+                          display:'flex',
+                          alignItems:'center',
+                          justifyContent:'space-between',
+                          gap:'10px',
+                          textAlign:'left',
+                          cursor:'pointer',
+                          fontSize:'14px'
+                        }}
+                      >
+                        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {selectedMember
+                            ? surnameFirst(selectedMember.full_name)
                             : 'Cerca e seleziona un socio'}
-                      </span>
-                      <Search size={17}/>
-                    </button>
+                        </span>
+                        <Search size={17}/>
+                      </button>
+                    )}
 
                     {guestAllowed&&
                       <button
                         type="button"
-                        onClick={()=>chooseGuest(i)}
+                        onClick={()=>{
+                          if(selectedId==='guest'){
+                            openPlayerSelector(i);
+                          } else {
+                            chooseGuest(i);
+                          }
+                        }}
                         style={{
                           justifySelf:'start',
                           border:0,
@@ -3715,21 +3744,10 @@ aria-label={
                           cursor:'pointer'
                         }}
                       >
-                        {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
+                        {selectedId==='guest'
+                          ? '← Seleziona un socio'
+                          : '＋ Inserisci ospite esterno'}
                       </button>
-                    }
-
-                    {selectedId==='guest'&&guestAllowed&&
-                      <input
-                        placeholder="Nome e cognome ospite"
-                        value={newBooking.guests[i]||''}
-                        onChange={e=>{
-                          const a=[...newBooking.guests];
-                          a[i]=e.target.value;
-                          setNewBooking({...newBooking,guests:a});
-                        }}
-                        required
-                      />
                     }
                   </div>
                 </div>
