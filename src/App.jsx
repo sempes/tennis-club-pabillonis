@@ -3701,19 +3701,31 @@ aria-label={
                     </button>
 
                     {guestAllowed&&
-                      <button
-                        type="button"
-                        onClick={()=>chooseGuest(i)}
-                        style={{
-                          justifySelf:'start',
-                          border:0,
-                          background:'transparent',
-                          color:'#557b42',
-                          padding:'3px 0',
-                          fontSize:'13px',
-                          fontWeight:600,
-                          cursor:'pointer'
-                        }}
+  <button
+    type="button"
+    onClick={()=>{
+      if(selectedId==='guest'){
+        openPlayerSelector(i);
+      } else {
+        chooseGuest(i);
+      }
+    }}
+    style={{
+      justifySelf:'start',
+      border:0,
+      background:'transparent',
+      color:'#557b42',
+      padding:'3px 0',
+      fontSize:'13px',
+      fontWeight:600,
+      cursor:'pointer'
+    }}
+  >
+    {selectedId==='guest'
+      ? '← Seleziona un socio'
+      : '＋ Inserisci ospite esterno'}
+  </button>
+}
                       >
                         {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
                       </button>
