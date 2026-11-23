@@ -3669,7 +3669,16 @@ aria-label={
                 <div className="player-row" key={i}>
                   <span>{i+1}</span>
 
-                  <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
+                  <div style={{
+                    flex:'1 1 0%',
+                    minWidth:0,
+                    width:'100%',
+                    boxSizing:'border-box',
+                    display:'grid',
+                    gridTemplateColumns:'minmax(0, 1fr)',
+                    justifyItems:'stretch',
+                    gap:'8px'
+                  }}>
                     {selectedId==='guest'&&guestAllowed ? (
                       <input
                         type="text"
@@ -3682,9 +3691,13 @@ aria-label={
                         }}
                         required
                         style={{
+                          display:'block',
                           width:'100%',
-                          minHeight:'46px',
+                          minWidth:0,
+                          maxWidth:'100%',
+                          justifySelf:'stretch',
                           boxSizing:'border-box',
+                          minHeight:'46px',
                           padding:'10px 12px',
                           border:'1px solid #dce5dc',
                           borderRadius:'10px',
