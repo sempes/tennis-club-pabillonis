@@ -24,6 +24,27 @@ const dateToDayNumber = date => {
   return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
 };
 
+// Inizio assoluto di un evento in minuti.
+const eventStartAbsolute = event =>
+  dateToDayNumber(event.event_date) * 1440 +
+  timeToMinutes(event.start_time);
+
+// Fine assoluta dell'evento.
+// Se l'orario di fine è uguale o precedente all'inizio,
+// l'evento termina il giorno successivo.
+const eventEndAbsolute = event => {
+  const start = eventStartAbsolute(event);
+
+  let end =
+    dateToDayNumber(event.event_date) * 1440 +
+    timeToMinutes(event.end_time);
+
+  if (end <= start) {
+    end += 1440;
+  }
+
+  return end;
+};
 // Inizio assoluto di una prenotazione in minuti.
 const bookingStartAbsolute = booking =>
   dateToDayNumber(booking.booking_date) * 1440 +
@@ -970,13 +991,8 @@ const availableBookingHours = useMemo(() => {
         return false;
       }
 
-      const eventStart =
-        dateToDayNumber(event.event_date) * 1440 +
-        timeToMinutes(event.start_time);
-
-      const eventEnd =
-        dateToDayNumber(event.event_date) * 1440 +
-        timeToMinutes(event.end_time);
+      const eventStart = eventStartAbsolute(event);
+const eventEnd = eventEndAbsolute(event);
 
       return (
         candidateStart < eventEnd &&
@@ -1014,8 +1030,8 @@ const availableAdminBookingHours = useMemo(() => {
       if (event.status !== 'active') return false;
       const eventCourts = (event.event_courts || []).map(ec => String(ec.court_id));
       if (!eventCourts.includes(String(adminBooking.court_id))) return false;
-      const eventStart = dateToDayNumber(event.event_date) * 1440 + timeToMinutes(event.start_time);
-      const eventEnd = dateToDayNumber(event.event_date) * 1440 + timeToMinutes(event.end_time);
+      const eventStart = eventStartAbsolute(event);
+      const eventEnd = eventEndAbsolute(event);
       return candidateStart < eventEnd && candidateEnd > eventStart;
     });
 
@@ -1195,20 +1211,20 @@ function bookingAt(c, t) {
   });
 }
 function eventAt(c,t){
-  const slotStart=timeToMinutes(t);
+  const slotStart =
+    dateToDayNumber(selectedDate) * 1440 +
+    timeToMinutes(t);
 
   return events.find(event=>{
-    if(event.event_date!==selectedDate) return false;
-
     const eventCourtIds=(event.event_courts||[])
       .map(ec=>String(ec.court_id));
 
     if(!eventCourtIds.includes(String(c))) return false;
 
-    const eventStart=timeToMinutes(event.start_time);
-    const eventEnd=timeToMinutes(event.end_time);
+    const eventStart = eventStartAbsolute(event);
+    const eventEnd = eventEndAbsolute(event);
 
-    return slotStart>=eventStart && slotStart<eventEnd;
+    return slotStart >= eventStart && slotStart < eventEnd;
   });
 }
   function playerNames(b){
