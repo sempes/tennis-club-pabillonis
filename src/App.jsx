@@ -1973,7 +1973,7 @@ async function deleteAdmin(id){
   <CalendarDays size={18}/> Gestione eventi
 </button>}
 
-{isAdmin&&<button type="button"
+{isSuperAdmin&&<button type="button"
   className={activeView==='history'?'nav-active nav-button':'nav-button'}
   onClick={()=>setActiveView('history')}
   style={{height:'auto',minHeight:'42px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap'}}>
