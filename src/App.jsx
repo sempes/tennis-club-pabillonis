@@ -3543,7 +3543,13 @@ aria-label={
                     {guestAllowed&&
                       <button
                         type="button"
-                        onClick={()=>chooseAdminGuest(i)}
+                        onClick={()=>{
+                          if(selectedId==='guest'){
+                            openAdminPlayerSelector(i);
+                          } else {
+                            chooseAdminGuest(i);
+                          }
+                        }}
                         style={{
                           alignSelf:'flex-start',
                           display:'inline-block',
@@ -3560,7 +3566,7 @@ aria-label={
                         }}
                       >
                         {selectedId==='guest'
-                          ? 'Ospite selezionato'
+                          ? '← Seleziona un socio'
                           : '＋ Inserisci ospite esterno'}
                       </button>
                     }
