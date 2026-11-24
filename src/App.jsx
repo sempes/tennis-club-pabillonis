@@ -742,7 +742,7 @@ if(ee) {
   }
 
   async function loadBookingHistory() {
-    if (!session || !isAdmin || profile?.status !== 'active') return;
+    if (!session || !isSuperAdmin || profile?.status !== 'active') return;
 
     setHistoryLoading(true);
     setHistoryError('');
@@ -763,12 +763,12 @@ if(ee) {
     setHistoryLoading(false);
   }
 
-  // Lo storico viene caricato soltanto quando un amministratore apre la relativa sezione.
-  useEffect(() => {
-    if (activeView === 'history' && isAdmin && profile?.status === 'active') {
-      loadBookingHistory();
-    }
-  }, [activeView, isAdmin, profile?.status, session?.user?.id]);
+  // Lo storico viene caricato soltanto quando un Super Admin apre la relativa sezione.
+useEffect(() => {
+  if (activeView === 'history' && isSuperAdmin && profile?.status === 'active') {
+    loadBookingHistory();
+  }
+}, [activeView, isSuperAdmin, profile?.status, session?.user?.id]);
 
   async function login(e){
     e.preventDefault();
