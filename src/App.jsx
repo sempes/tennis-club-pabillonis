@@ -3450,72 +3450,126 @@ aria-label={
               const guestAllowed=adminBooking.type==='singles'?i===1:i>=2;
               const selectedId=adminBooking.players[i];
               const selectedMember=members.find(m=>m.id===selectedId);
-              return <div className="player-row" key={i}>
-                <span>{i+1}</span>
-                <div style={{flex:1,minWidth:0,display:'grid',gap:'8px'}}>
-                  <button
-                    type="button"
-                    onClick={()=>openAdminPlayerSelector(i)}
-                    style={{
-                      width:'100%',
-                      minHeight:'46px',
-                      padding:'10px 12px',
-                      border:'1px solid #dce5dc',
-                      borderRadius:'10px',
-                      background:'#ffffff',
-                      color:selectedMember?'#193329':'#829087',
-                      display:'flex',
-                      alignItems:'center',
-                      justifyContent:'space-between',
-                      gap:'10px',
-                      textAlign:'left',
-                      cursor:'pointer',
-                      fontSize:'14px'
-                    }}
-                  >
-                    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                      {selectedMember
-                        ? surnameFirst(selectedMember.full_name)
-                        : selectedId==='guest'
-                          ? 'Ospite esterno'
-                          : `Cerca e seleziona un socio${i===0?' (intestatario)':''}`}
-                    </span>
-                    <Search size={17}/>
-                  </button>
-                  {guestAllowed&&
-                    <button
-                      type="button"
-                      onClick={()=>chooseAdminGuest(i)}
-                      style={{
-                        justifySelf:'start',
-                        border:0,
-                        background:'transparent',
-                        color:'#557b42',
-                        padding:'3px 0',
-                        fontSize:'13px',
-                        fontWeight:600,
-                        cursor:'pointer'
-                      }}
-                    >
-                      {selectedId==='guest'?'Ospite selezionato':'＋ Inserisci ospite esterno'}
-                    </button>
-                  }
-                  {selectedId==='guest'&&guestAllowed&&<input
-                    placeholder="Nome e cognome ospite"
-                    value={adminBooking.guests[i]||''}
-                    onChange={e=>{
-                      const guests=[...adminBooking.guests];
-                      guests[i]=e.target.value;
-                      setAdminBooking({...adminBooking,guests});
-                    }}
-                    required
-                  />}
-                  {i===0&&<small style={{color:'#557b42'}}>Questo socio sarà l’intestatario della prenotazione.</small>}
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display:'flex',
+                    flexDirection:'row',
+                    alignItems:'flex-start',
+                    gap:'16px',
+                    width:'100%',
+                    minWidth:0,
+                    boxSizing:'border-box'
+                  }}
+                >
+                  <span style={{
+                    display:'block',
+                    flex:'0 0 40px',
+                    width:'40px',
+                    paddingTop:'12px',
+                    boxSizing:'border-box'
+                  }}>{i+1}</span>
+
+                  <div style={{
+                    display:'flex',
+                    flexDirection:'column',
+                    alignItems:'stretch',
+                    flex:'1 1 0%',
+                    minWidth:0,
+                    width:'0',
+                    boxSizing:'border-box',
+                    gap:'8px'
+                  }}>
+                    {selectedId==='guest'&&guestAllowed ? (
+                      <input
+                        type="text"
+                        placeholder="Nome e cognome ospite"
+                        value={adminBooking.guests[i]||''}
+                        onChange={e=>{
+                          const guests=[...adminBooking.guests];
+                          guests[i]=e.target.value;
+                          setAdminBooking({...adminBooking,guests});
+                        }}
+                        required
+                        style={{
+                          display:'block',
+                          flex:'1 1 auto',
+                          width:'100%',
+                          minWidth:0,
+                          maxWidth:'100%',
+                          alignSelf:'stretch',
+                          boxSizing:'border-box',
+                          minHeight:'46px',
+                          padding:'10px 12px',
+                          border:'1px solid #dce5dc',
+                          borderRadius:'10px',
+                          background:'#ffffff',
+                          color:'#193329',
+                          fontSize:'14px'
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={()=>openAdminPlayerSelector(i)}
+                        style={{
+                          width:'100%',
+                          minHeight:'46px',
+                          padding:'10px 12px',
+                          border:'1px solid #dce5dc',
+                          borderRadius:'10px',
+                          background:'#ffffff',
+                          color:selectedMember?'#193329':'#829087',
+                          display:'flex',
+                          alignItems:'center',
+                          justifyContent:'space-between',
+                          gap:'10px',
+                          textAlign:'left',
+                          cursor:'pointer',
+                          fontSize:'14px'
+                        }}
+                      >
+                        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {selectedMember
+                            ? surnameFirst(selectedMember.full_name)
+                            : 'Cerca e seleziona un socio'}
+                        </span>
+                        <Search size={17}/>
+                      </button>
+                    )}
+
+                    {guestAllowed&&
+                      <button
+                        type="button"
+                        onClick={()=>chooseAdminGuest(i)}
+                        style={{
+                          alignSelf:'flex-start',
+                          display:'inline-block',
+                          whiteSpace:'nowrap',
+                          width:'max-content',
+                          maxWidth:'100%',
+                          border:0,
+                          background:'transparent',
+                          color:'#557b42',
+                          padding:'3px 0',
+                          fontSize:'13px',
+                          fontWeight:600,
+                          cursor:'pointer'
+                        }}
+                      >
+                        {selectedId==='guest'
+                          ? 'Ospite selezionato'
+                          : '＋ Inserisci ospite esterno'}
+                      </button>
+                    }
+                    {i===0&&<small style={{color:'#557b42'}}>Questo socio sarà l’intestatario della prenotazione.</small>}
+                  </div>
                 </div>
-              </div>;
+              );
             })}
           </div>
-
           <div className="modal-note">
             <Clock3 size={16}/> Prenotazione di {adminBooking.type==='doubles'?120:60} minuti · massimo 2 giorni in anticipo
           </div>
