@@ -258,7 +258,7 @@ const [savingEvent,setSavingEvent] = useState(false);
   const [showAdminBooking,setShowAdminBooking] = useState(false);
   const [savingAdminBooking,setSavingAdminBooking] = useState(false);
   const [adminBooking,setAdminBooking] = useState({
-    court_id:'1',time:'09:00',type:'singles',players:['','','',''],guests:['','','','']
+    court_id:'1',time:'',type:'singles',players:['','','',''],guests:['','','','']
   });
   const [showPassword,setShowPassword] = useState(false);
   const [selectedBooking,setSelectedBooking] = useState(null);
@@ -284,7 +284,7 @@ const [editingRegulation,setEditingRegulation] = useState(false);
 const [savingRegulation,setSavingRegulation] = useState(false);
   const [openMemberMenu,setOpenMemberMenu] = useState(null);
   const [newBooking,setNewBooking] = useState({
-    court_id:'1',time:'09:00',type:'singles',players:['',''],guests:['','']
+    court_id:'1',time:'',type:'singles',players:['',''],guests:['','']
   });
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -1030,16 +1030,26 @@ const availableAdminBookingHours = useMemo(() => {
   useEffect(()=>{
     if(!showBooking) return;
 
-    if(
-      availableBookingHours.length>0 &&
-      !availableBookingHours.includes(newBooking.time)
-    ){
+    const firstAvailable = availableBookingHours[0] || '';
+    if(!availableBookingHours.includes(newBooking.time)){
       setNewBooking(prev=>({
         ...prev,
-        time:availableBookingHours[0]
+        time:firstAvailable
       }));
     }
   },[showBooking,availableBookingHours,newBooking.time]);
+
+  useEffect(()=>{
+    if(!showAdminBooking) return;
+
+    const firstAvailable = availableAdminBookingHours[0] || '';
+    if(!availableAdminBookingHours.includes(adminBooking.time)){
+      setAdminBooking(prev=>({
+        ...prev,
+        time:firstAvailable
+      }));
+    }
+  },[showAdminBooking,availableAdminBookingHours,adminBooking.time]);
 
   
 const busyMemberIds = useMemo(() => {
@@ -1144,6 +1154,22 @@ const busyMemberIds = useMemo(() => {
     guests[index]='';
 
     setNewBooking({...newBooking,players,guests});
+  }
+
+  // Chiudendo una finestra di prenotazione si scartano i dati non confermati.
+  function closeNewBooking(){
+    setShowBooking(false);
+    setNewBooking({court_id:'1',time:'',type:'singles',players:['',''],guests:['','']});
+    setSelectedPlayerIndex(null);
+    setMemberSearch('');
+  }
+
+  function closeAdminBooking(){
+    if(savingAdminBooking) return;
+    setShowAdminBooking(false);
+    setAdminBooking({court_id:'1',time:'',type:'singles',players:['','','',''],guests:['','','','']});
+    setSelectedAdminPlayerIndex(null);
+    setMemberSearch('');
   }
   
 function bookingAt(c, t) {
@@ -1366,7 +1392,7 @@ function eventAt(c,t){
     }
 
     setShowAdminBooking(false);
-    setAdminBooking({court_id:'1',time:'09:00',type:'singles',players:['','','',''],guests:['','','','']});
+    setAdminBooking({court_id:'1',time:'',type:'singles',players:['','','',''],guests:['','','','']});
     setNotice('Prenotazione amministrativa confermata.');
     await loadData();
   }
@@ -2054,13 +2080,13 @@ async function deleteAdmin(id){
             className="password-button"
             onClick={()=>{
               setNotice('');
-              setAdminBooking({court_id:court==='all'?'1':court,time:'09:00',type:'singles',players:['','','',''],guests:['','','','']});
+              setAdminBooking({court_id:court==='all'?'1':court,time:'',type:'singles',players:['','','',''],guests:['','','','']});
               setShowAdminBooking(true);
             }}
           >
             <Plus size={17}/> Prenota per un socio
           </button>}
-          {!isAdmin&&<button className="primary" onClick={()=>setShowBooking(true)} disabled={!canBook()}>
+          {!isAdmin&&<button className="primary" onClick={()=>{setNewBooking({court_id:'1',time:'',type:'singles',players:['',''],guests:['','']});setShowBooking(true);}} disabled={!canBook()}>
             <Plus size={17}/> Nuova prenotazione
           </button>}
         </div>
@@ -3338,7 +3364,7 @@ aria-label={
       </div>
     </div>}
 
-    {showAdminBooking&&isAdmin&&<div className="modal-backdrop" onClick={()=>!savingAdminBooking&&setShowAdminBooking(false)}>
+    {showAdminBooking&&isAdmin&&<div className="modal-backdrop" onClick={closeAdminBooking}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-top">
           <div>
@@ -3346,7 +3372,7 @@ aria-label={
             <h2>Prenota per un socio.</h2>
             <p className="muted" style={{margin:'6px 0 0'}}>Il primo socio selezionato sarà intestatario e giocatore. Tu risulterai come creatore.</p>
           </div>
-          <button type="button" className="icon-button" onClick={()=>setShowAdminBooking(false)} disabled={savingAdminBooking}><X/></button>
+          <button type="button" className="icon-button" onClick={closeAdminBooking} disabled={savingAdminBooking}><X/></button>
         </div>
 
         <div style={{background:'#eaf5ff',border:'1px solid #c9e5f8',borderRadius:'12px',padding:'12px 14px',marginBottom:'18px',fontSize:'13px',color:'#174b70'}}>
@@ -3417,7 +3443,7 @@ aria-label={
 
         <form onSubmit={createAdminBooking}>
           <label>Campo
-            <select value={adminBooking.court_id} onChange={e=>setAdminBooking({...adminBooking,court_id:e.target.value})}>
+            <select value={adminBooking.court_id} onChange={e=>setAdminBooking({...adminBooking,court_id:e.target.value,time:''})}>
               <option value="1">Campo 1</option>
               <option value="2">Campo 2</option>
             </select>
@@ -3438,7 +3464,7 @@ aria-label={
           </label>
 
           <label>Tipo di partita
-            <select value={adminBooking.type} onChange={e=>setAdminBooking({...adminBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
+            <select value={adminBooking.type} onChange={e=>setAdminBooking({...adminBooking,type:e.target.value,time:'',players:['','','',''],guests:['','','','']})}>
               <option value="singles">Singolo · 2 giocatori</option>
               <option value="doubles">Doppio · 4 giocatori</option>
             </select>
@@ -3586,14 +3612,14 @@ aria-label={
       </div>
     </div>}
 
-    {showBooking&&<div className="modal-backdrop" onClick={()=>setShowBooking(false)}>
+    {showBooking&&<div className="modal-backdrop" onClick={closeNewBooking}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-top">
           <div>
             <span className="eyebrow">NUOVA PRENOTAZIONE</span>
             <h2>Scendi in campo.</h2>
           </div>
-          <button className="icon-button" onClick={()=>setShowBooking(false)}><X/></button>
+          <button type="button" className="icon-button" onClick={closeNewBooking}><X/></button>
         </div>
 
         
@@ -3665,7 +3691,8 @@ aria-label={
               value={newBooking.court_id}
               onChange={e=>setNewBooking({
                 ...newBooking,
-                court_id:e.target.value
+                court_id:e.target.value,
+                time:''
               })}
             >
               <option value="1">Campo 1</option>
@@ -3711,7 +3738,7 @@ aria-label={
 
           <label>Tipo di partita
             <select value={newBooking.type}
-              onChange={e=>setNewBooking({...newBooking,type:e.target.value,players:['','','',''],guests:['','','','']})}>
+              onChange={e=>setNewBooking({...newBooking,type:e.target.value,time:'',players:['','','',''],guests:['','','','']})}>
               <option value="singles">Singolo · 2 giocatori</option>
               <option value="doubles">Doppio · 4 giocatori</option>
             </select>
