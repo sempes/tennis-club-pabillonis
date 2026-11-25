@@ -95,6 +95,7 @@ function SelectField({ label, name, value, onChange, children }) {
 export default function MemberRegistry({ profile, members = [], onRegistrySaved }) {
   const [records, setRecords] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -118,10 +119,11 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setLoading(true);
     setError('');
 
-    const [registryResult, categoriesResult] = await Promise.all([
+    const [registryResult, categoriesResult, assignmentsResult] = await Promise.all([
       supabase.from('member_registry').select('*').order('full_name', { ascending: true }),
       supabase.from('member_categories').select('id,name,active,sort_order')
-        .order('sort_order').order('name')
+        .order('sort_order').order('name'),
+      supabase.from('member_registry_categories').select('member_id,category_id')
     ]);
 
     if (registryResult.error) {
@@ -154,15 +156,36 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
         if (surnameCompare !== 0) return surnameCompare;
         return left.first.localeCompare(right.first, 'it', { sensitivity: 'base' });
       });
-      setRecords(nextRecords);
+      const categoryIdsByMember = new Map();
+      if (!assignmentsResult.error) {
+        for (const assignment of assignmentsResult.data || []) {
+          const currentIds = categoryIdsByMember.get(assignment.member_id) || [];
+          currentIds.push(assignment.category_id);
+          categoryIdsByMember.set(assignment.member_id, currentIds);
+        }
+      }
+      const recordsWithCategories = nextRecords.map(record => ({
+        ...record,
+        category_ids: categoryIdsByMember.get(record.id) || []
+      }));
+      setRecords(recordsWithCategories);
       if (keepSelection && selectedId) {
-        const current = nextRecords.find(item => item.id === selectedId);
-        if (current) setForm(toForm(current));
+        const current = recordsWithCategories.find(item => item.id === selectedId);
+        if (current) {
+          setForm(toForm(current));
+          setSelectedCategoryIds(current.category_ids);
+        }
         else {
           setSelectedId(null);
           setForm(emptyMember);
+          setSelectedCategoryIds([]);
         }
       }
+    }
+
+    if (assignmentsResult.error) {
+      setError(previous => [previous, 'Categorie dei soci non disponibili: ' + assignmentsResult.error.message]
+        .filter(Boolean).join(' · '));
     }
 
     if (categoriesResult.error) {
@@ -224,6 +247,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setNotice('');
     setError('');
     setForm({ ...emptyMember });
+    setSelectedCategoryIds([]);
   }
 
   function selectRecord(record) {
@@ -232,6 +256,13 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setNotice('');
     setError('');
     setForm(toForm(record));
+    setSelectedCategoryIds(record.category_ids || []);
+  }
+
+  function toggleCategory(categoryId) {
+    setSelectedCategoryIds(previous => previous.includes(categoryId)
+      ? previous.filter(id => id !== categoryId)
+      : [...previous, categoryId]);
   }
 
   function changeField(event) {
@@ -254,6 +285,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setCreating(false);
     setSelectedId(null);
     setForm(emptyMember);
+    setSelectedCategoryIds([]);
     setNotice('');
     setError('');
   }
@@ -292,7 +324,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       enrollment_date: form.enrollment_date || null,
       membership_end_date: form.membership_end_date || null,
       membership_status: form.membership_status,
-      category_id: form.category_id || null,
+      category_id: selectedCategoryIds[0] || null,
       internal_notes: form.internal_notes.trim() || null,
       updated_by: profile.id
     };
@@ -309,17 +341,74 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       : await supabase.from('member_registry').update(payload)
           .eq('id', selectedId).select('*').single();
 
-    setSaving(false);
-
     if (result.error) {
+      setSaving(false);
       setError('Salvataggio non riuscito: ' + result.error.message);
       return;
     }
 
+    // Salva le categorie multiple nella tabella di collegamento.
+    // La colonna category_id della scheda resta aggiornata con la prima
+    // categoria selezionata per compatibilità con le funzioni precedenti.
+    const memberId = result.data.id;
+    const existingAssignments = await supabase
+      .from('member_registry_categories')
+      .select('category_id')
+      .eq('member_id', memberId);
+
+    if (existingAssignments.error) {
+      setSaving(false);
+      setError('Scheda salvata, ma non è stato possibile leggere le categorie assegnate: '
+        + existingAssignments.error.message);
+      await loadRegistry(true);
+      return;
+    }
+
+    const existingIds = (existingAssignments.data || []).map(item => item.category_id);
+    const selectedIds = [...new Set(selectedCategoryIds)];
+    const idsToAdd = selectedIds.filter(id => !existingIds.includes(id));
+    const idsToRemove = existingIds.filter(id => !selectedIds.includes(id));
+
+    if (idsToAdd.length) {
+      const assignmentInsert = await supabase
+        .from('member_registry_categories')
+        .insert(idsToAdd.map(categoryId => ({
+          member_id: memberId,
+          category_id: categoryId,
+          assigned_by: profile.id
+        })));
+
+      if (assignmentInsert.error) {
+        setSaving(false);
+        setError('Scheda salvata, ma errore nell’assegnazione delle categorie: '
+          + assignmentInsert.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
+
+    for (const categoryId of idsToRemove) {
+      const assignmentDelete = await supabase
+        .from('member_registry_categories')
+        .delete()
+        .eq('member_id', memberId)
+        .eq('category_id', categoryId);
+
+      if (assignmentDelete.error) {
+        setSaving(false);
+        setError('Scheda salvata, ma non è stato possibile rimuovere una categoria: '
+          + assignmentDelete.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
+
+    setSaving(false);
     setNotice(creating ? 'Nuova scheda anagrafica creata.' : 'Scheda anagrafica aggiornata.');
     setCreating(false);
     setSelectedId(result.data.id);
     setForm(toForm(result.data));
+    setSelectedCategoryIds(selectedIds);
     await loadRegistry(true);
 
     // Se è stato modificato lo stato associativo di un socio collegato,
@@ -433,6 +522,19 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                               : record.membership_status === 'ceased' ? 'Cessato' : 'Archiviato'}
                             {account?.email ? ` · ${account.email}` : ''}
                           </small>
+                          {(record.category_ids || []).length > 0 && (
+                            <span style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:5}}>
+                              {record.category_ids.map(categoryId => {
+                                const category = categories.find(item => item.id === categoryId);
+                                return category ? (
+                                  <small key={categoryId} style={{
+                                    padding:'2px 6px',borderRadius:999,
+                                    background:'#eaf2e6',color:'#45633d',fontSize:10,fontWeight:700
+                                  }}>{category.name}</small>
+                                ) : null;
+                              })}
+                            </span>
+                          )}
                         </span>
                         <ChevronRight size={16} color="#849187"/>
                       </button>
@@ -513,10 +615,33 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                     <option value="ceased">Cessato</option>
                     <option value="archived">Archiviato</option>
                   </SelectField>
-                  <SelectField label="Categoria" name="category_id" value={form.category_id} onChange={changeField}>
-                    <option value="">Nessuna categoria</option>
-                    {categories.filter(item => item.active).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </SelectField>
+                  <div style={{gridColumn:'1 / -1',display:'grid',gap:8}}>
+                    <span style={labelStyle}>Categorie associative (selezionabili più categorie)</span>
+                    <div style={{
+                      display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',
+                      gap:8,padding:12,border:'1px solid #dce4dc',borderRadius:10,background:'#fbfcfa'
+                    }}>
+                      {categories.filter(item => item.active).map(item => (
+                        <label key={item.id} style={{
+                          display:'flex',alignItems:'center',gap:9,padding:'8px 9px',
+                          borderRadius:8,background:selectedCategoryIds.includes(item.id)?'#edf5e9':'#fff',
+                          border:'1px solid '+(selectedCategoryIds.includes(item.id)?'#a9c49f':'#e4eae2'),
+                          color:'#304338',fontSize:13,fontWeight:600,cursor:'pointer'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedCategoryIds.includes(item.id)}
+                            onChange={() => toggleCategory(item.id)}
+                            style={{accentColor:'#557b42',width:16,height:16}}
+                          />
+                          {item.name}
+                        </label>
+                      ))}
+                      {categories.filter(item => item.active).length === 0 && (
+                        <span className="muted">Nessuna categoria attiva disponibile.</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
