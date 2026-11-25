@@ -699,6 +699,25 @@ const [savingRegulation,setSavingRegulation] = useState(false);
     await refreshAnnouncementsNow();
   }
 
+  // Aggiorna in memoria gli account socio dopo una modifica effettuata
+  // dall'Anagrafica, senza ricaricare prenotazioni o l'intera applicazione.
+  async function refreshMemberProfiles(){
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id,full_name,email,status,role')
+      .eq('role', 'member')
+      .order('full_name');
+
+    if(error){
+      setNotice('Errore aggiornamento elenco soci: ' + error.message);
+      return;
+    }
+
+    const memberList = (data || []).sort(sortBySurname);
+    setAllMembers(memberList);
+    setMembers(memberList.filter(member => member.status === 'active'));
+  }
+
   async function loadData(){
     if(!session) return;
     setLoading(true);
@@ -2385,7 +2404,7 @@ aria-label={
   </div>
 </section>}
 
-{activeView==='memberRegistry'&&isSuperAdmin&&<MemberRegistry profile={profile} members={allMembers}/>}
+{activeView==='memberRegistry'&&isSuperAdmin&&<MemberRegistry profile={profile} members={allMembers} onRegistrySaved={refreshMemberProfiles}/>}
 
 {activeView==='regulation'&&<section className="admin-panel">
   <div className="admin-heading">
