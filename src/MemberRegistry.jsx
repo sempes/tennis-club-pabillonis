@@ -96,6 +96,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [records, setRecords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
+  const [contactEmail, setContactEmail] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -248,15 +249,30 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setError('');
     setForm({ ...emptyMember });
     setSelectedCategoryIds([]);
+    setContactEmail('');
   }
 
-  function selectRecord(record) {
+  async function selectRecord(record) {
     setSelectedId(record.id);
     setCreating(false);
     setNotice('');
     setError('');
     setForm(toForm(record));
     setSelectedCategoryIds(record.category_ids || []);
+    setContactEmail('');
+    const emailResult = await supabase
+      .from('member_contacts')
+      .select('value')
+      .eq('member_id', record.id)
+      .eq('contact_type', 'email')
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle();
+    if (emailResult.error) {
+      setError('Impossibile caricare l’email di contatto: ' + emailResult.error.message);
+    } else {
+      setContactEmail(emailResult.data?.value || '');
+    }
   }
 
   function toggleCategory(categoryId) {
@@ -286,6 +302,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setSelectedId(null);
     setForm(emptyMember);
     setSelectedCategoryIds([]);
+    setContactEmail('');
     setNotice('');
     setError('');
   }
@@ -347,10 +364,63 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       return;
     }
 
+    const memberId = result.data.id;
+
+    // L'email di contatto è indipendente dall'email dell'account.
+    // Viene gestita in member_contacts come contatto email principale.
+    const currentContactEmail = await supabase
+      .from('member_contacts')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('contact_type', 'email')
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (currentContactEmail.error) {
+      setSaving(false);
+      setError('Scheda salvata, ma non è stato possibile verificare l’email di contatto: '
+        + currentContactEmail.error.message);
+      await loadRegistry(true);
+      return;
+    }
+
+    const normalizedContactEmail = contactEmail.trim();
+    let contactEmailResult = { error: null };
+
+    if (normalizedContactEmail && currentContactEmail.data?.id) {
+      contactEmailResult = await supabase
+        .from('member_contacts')
+        .update({ value: normalizedContactEmail, label: 'Email di contatto' })
+        .eq('id', currentContactEmail.data.id);
+    } else if (normalizedContactEmail) {
+      contactEmailResult = await supabase
+        .from('member_contacts')
+        .insert({
+          member_id: memberId,
+          contact_type: 'email',
+          label: 'Email di contatto',
+          value: normalizedContactEmail,
+          is_primary: true
+        });
+    } else if (currentContactEmail.data?.id) {
+      contactEmailResult = await supabase
+        .from('member_contacts')
+        .delete()
+        .eq('id', currentContactEmail.data.id);
+    }
+
+    if (contactEmailResult.error) {
+      setSaving(false);
+      setError('Scheda salvata, ma non è stato possibile salvare l’email di contatto: '
+        + contactEmailResult.error.message);
+      await loadRegistry(true);
+      return;
+    }
+
     // Salva le categorie multiple nella tabella di collegamento.
     // La colonna category_id della scheda resta aggiornata con la prima
     // categoria selezionata per compatibilità con le funzioni precedenti.
-    const memberId = result.data.id;
     const existingAssignments = await supabase
       .from('member_registry_categories')
       .select('category_id')
@@ -498,7 +568,6 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
               ? <p className="muted">Nessuna scheda trovata.</p>
               : <div style={{display:'grid',gap:6,maxHeight:560,overflowY:'auto'}}>
                   {filteredRecords.map(record => {
-                    const account = profileById.get(record.profile_id);
                     const active = selectedId === record.id && !creating;
                     return (
                       <button key={record.id} type="button" onClick={()=>selectRecord(record)}
@@ -516,25 +585,6 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                           <strong style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13}}>
                             {surnameFirstLabel(record)}
                           </strong>
-                          <small style={{display:'block',color:'#718078',marginTop:3}}>
-                            {record.membership_status === 'active' ? 'Socio attivo'
-                              : record.membership_status === 'suspended' ? 'Sospeso'
-                              : record.membership_status === 'ceased' ? 'Cessato' : 'Archiviato'}
-                            {account?.email ? ` · ${account.email}` : ''}
-                          </small>
-                          {(record.category_ids || []).length > 0 && (
-                            <span style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:5}}>
-                              {record.category_ids.map(categoryId => {
-                                const category = categories.find(item => item.id === categoryId);
-                                return category ? (
-                                  <small key={categoryId} style={{
-                                    padding:'2px 6px',borderRadius:999,
-                                    background:'#eaf2e6',color:'#45633d',fontSize:10,fontWeight:700
-                                  }}>{category.name}</small>
-                                ) : null;
-                              })}
-                            </span>
-                          )}
                         </span>
                         <ChevronRight size={16} color="#849187"/>
                       </button>
@@ -558,7 +608,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                 <div>
                   <span className="eyebrow">{creating ? 'NUOVA SCHEDA' : 'SCHEDA ANAGRAFICA'}</span>
                   <h3 style={{margin:'4px 0 0',fontSize:19}}>{creating ? 'Inserisci un nuovo socio' : form.full_name}</h3>
-                  {linkedProfile?.email && <small className="muted">Account collegato: {linkedProfile.email}</small>}
+                  {linkedProfile?.email && <small className="muted" style={{display:'block',marginTop:5}}>Email account (accesso app): {linkedProfile.email}</small>}
                 </div>
                 <button type="button" className="password-button" onClick={cancelEdit}
                   style={{display:'inline-flex',alignItems:'center',gap:6}}>
@@ -574,6 +624,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                   <Field label="Data di nascita" name="birth_date" type="date" value={form.birth_date} onChange={changeField}/>
                   <Field label="Luogo di nascita" name="birth_place" value={form.birth_place} onChange={changeField}/>
                   <Field label="Codice fiscale" name="tax_code" value={form.tax_code} onChange={changeField} maxLength={32}/>
+                  <Field label="Email di contatto" name="contact_email" type="email" value={contactEmail} onChange={event => setContactEmail(event.target.value)} placeholder="email personale" />
                   <Field label="Cittadinanza" name="citizenship" value={form.citizenship} onChange={changeField}/>
                   <SelectField label="Genere" name="gender" value={form.gender} onChange={changeField}>
                     <option value="">Non specificato</option>
