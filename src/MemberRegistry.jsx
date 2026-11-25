@@ -127,7 +127,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 
           // Compatibilità con le schede importate prima della
           // separazione dei campi nome/cognome.
-          const words = (record.full_name || '').trim().split(/\\s+/).filter(Boolean);
+          const words = (record.full_name || '').trim().split(/\s+/).filter(Boolean);
           return {
             first: words.shift() || '',
             last: words.join(' ')
