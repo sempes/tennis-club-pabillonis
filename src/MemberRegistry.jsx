@@ -30,6 +30,20 @@ const emptyMember = {
   internal_notes: ''
 };
 
+function surnameFirstLabel(record) {
+  const first = (record.first_name || '').trim();
+  const last = (record.last_name || '').trim();
+
+  if (first || last) {
+    return [last, first].filter(Boolean).join(' ') || 'Nome da completare';
+  }
+
+  const parts = (record.full_name || '').trim().split(/\\s+/).filter(Boolean);
+  if (parts.length < 2) return record.full_name || 'Nome da completare';
+  const givenName = parts.shift();
+  return `${parts.join(' ')} ${givenName}`;
+}
+
 const fieldStyle = {
   width: '100%',
   minWidth: 0,
@@ -407,11 +421,11 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                         }}>
                         <span style={{width:36,height:36,flex:'0 0 36px',borderRadius:12,background:'#e5eee2',
                           display:'grid',placeItems:'center',fontWeight:800,color:'#496b43'}}>
-                          {(record.full_name || '?').trim().charAt(0).toUpperCase()}
+                          {surnameFirstLabel(record).trim().charAt(0).toUpperCase()}
                         </span>
                         <span style={{minWidth:0,flex:1}}>
                           <strong style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:13}}>
-                            {record.full_name || 'Nome da completare'}
+                            {surnameFirstLabel(record)}
                           </strong>
                           <small style={{display:'block',color:'#718078',marginTop:3}}>
                             {record.membership_status === 'active' ? 'Socio attivo'
