@@ -114,7 +114,32 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       setError('Errore caricamento anagrafica: ' + registryResult.error.message);
       setRecords([]);
     } else {
-      const nextRecords = registryResult.data || [];
+      const nextRecords = [...(registryResult.data || [])].sort((a, b) => {
+        const parts = record => {
+          const first = (record.first_name || '').trim();
+          const last = (record.last_name || '').trim();
+          if (first || last) {
+            return {
+              first,
+              last: last || (record.full_name || '').trim()
+            };
+          }
+
+          // Compatibilità con le schede importate prima della
+          // separazione dei campi nome/cognome.
+          const words = (record.full_name || '').trim().split(/\\s+/).filter(Boolean);
+          return {
+            first: words.shift() || '',
+            last: words.join(' ')
+          };
+        };
+
+        const left = parts(a);
+        const right = parts(b);
+        const surnameCompare = left.last.localeCompare(right.last, 'it', { sensitivity: 'base' });
+        if (surnameCompare !== 0) return surnameCompare;
+        return left.first.localeCompare(right.first, 'it', { sensitivity: 'base' });
+      });
       setRecords(nextRecords);
       if (keepSelection && selectedId) {
         const current = nextRecords.find(item => item.id === selectedId);
