@@ -97,6 +97,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [categories, setCategories] = useState([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -250,6 +251,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setForm({ ...emptyMember });
     setSelectedCategoryIds([]);
     setContactEmail('');
+    setContactPhone('');
   }
 
   async function selectRecord(record) {
@@ -260,6 +262,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setForm(toForm(record));
     setSelectedCategoryIds(record.category_ids || []);
     setContactEmail('');
+    setContactPhone('');
     const emailResult = await supabase
       .from('member_contacts')
       .select('value')
@@ -272,6 +275,21 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       setError('Impossibile caricare l’email di contatto: ' + emailResult.error.message);
     } else {
       setContactEmail(emailResult.data?.value || '');
+    }
+
+    const phoneResult = await supabase
+      .from('member_contacts')
+      .select('value')
+      .eq('member_id', record.id)
+      .eq('contact_type', 'phone')
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle();
+    if (phoneResult.error) {
+      setError(previous => [previous, 'Impossibile caricare il telefono: ' + phoneResult.error.message]
+        .filter(Boolean).join(' · '));
+    } else {
+      setContactPhone(phoneResult.data?.value || '');
     }
   }
 
@@ -303,6 +321,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setForm(emptyMember);
     setSelectedCategoryIds([]);
     setContactEmail('');
+    setContactPhone('');
     setNotice('');
     setError('');
   }
@@ -414,6 +433,58 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       setSaving(false);
       setError('Scheda salvata, ma non è stato possibile salvare l’email di contatto: '
         + contactEmailResult.error.message);
+      await loadRegistry(true);
+      return;
+    }
+
+    // Il telefono di contatto è indipendente dall'account e viene
+    // memorizzato nella tabella member_contacts.
+    const currentContactPhone = await supabase
+      .from('member_contacts')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('contact_type', 'phone')
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (currentContactPhone.error) {
+      setSaving(false);
+      setError('Scheda salvata, ma non è stato possibile verificare il telefono: '
+        + currentContactPhone.error.message);
+      await loadRegistry(true);
+      return;
+    }
+
+    const normalizedContactPhone = contactPhone.trim();
+    let contactPhoneResult = { error: null };
+
+    if (normalizedContactPhone && currentContactPhone.data?.id) {
+      contactPhoneResult = await supabase
+        .from('member_contacts')
+        .update({ value: normalizedContactPhone, label: 'Telefono' })
+        .eq('id', currentContactPhone.data.id);
+    } else if (normalizedContactPhone) {
+      contactPhoneResult = await supabase
+        .from('member_contacts')
+        .insert({
+          member_id: memberId,
+          contact_type: 'phone',
+          label: 'Telefono',
+          value: normalizedContactPhone,
+          is_primary: true
+        });
+    } else if (currentContactPhone.data?.id) {
+      contactPhoneResult = await supabase
+        .from('member_contacts')
+        .delete()
+        .eq('id', currentContactPhone.data.id);
+    }
+
+    if (contactPhoneResult.error) {
+      setSaving(false);
+      setError('Scheda salvata, ma non è stato possibile salvare il telefono: '
+        + contactPhoneResult.error.message);
       await loadRegistry(true);
       return;
     }
@@ -625,6 +696,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                   <Field label="Luogo di nascita" name="birth_place" value={form.birth_place} onChange={changeField}/>
                   <Field label="Codice fiscale" name="tax_code" value={form.tax_code} onChange={changeField} maxLength={32}/>
                   <Field label="Email di contatto" name="contact_email" type="email" value={contactEmail} onChange={event => setContactEmail(event.target.value)} placeholder="email personale" />
+                  <Field label="Telefono" name="contact_phone" type="tel" value={contactPhone} onChange={event => setContactPhone(event.target.value)} placeholder="numero di telefono" />
                   <Field label="Cittadinanza" name="citizenship" value={form.citizenship} onChange={changeField}/>
                   <SelectField label="Genere" name="gender" value={form.gender} onChange={changeField}>
                     <option value="">Non specificato</option>
