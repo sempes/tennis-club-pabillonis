@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { configured, supabase } from './supabase';
 import MemberRegistry from './MemberRegistry';
+import FitpExpiry from './FitpExpiry';
 import clubLogo from '../logo-tennis-club-pabillonis.jpeg';
 import clabLogo from '../logo-clabc-solutions.png';
 
@@ -1995,6 +1996,13 @@ async function deleteAdmin(id){
         </button>
 
 
+        {(profile?.role === 'member' || isSuperAdmin)&&<button type="button"
+          className={activeView==='fitpExpiry'?'nav-active nav-button':'nav-button'}
+          onClick={()=>setActiveView('fitpExpiry')}
+          style={{height:'auto',minHeight:'42px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap'}}>
+          <CalendarDays size={18}/> {isSuperAdmin ? 'Scadenze FITP' : 'Le mie scadenze'}
+        </button>}
+
         {isSuperAdmin&&<button type="button"
           className={activeView==='memberRegistry'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('memberRegistry')}
@@ -2405,6 +2413,8 @@ aria-label={
 </section>}
 
 {activeView==='memberRegistry'&&isSuperAdmin&&<MemberRegistry profile={profile} members={allMembers} onRegistrySaved={refreshMemberProfiles}/>}
+
+{activeView==='fitpExpiry'&&(profile?.role === 'member' || isSuperAdmin)&&<FitpExpiry profile={profile}/>}
 
 {activeView==='regulation'&&<section className="admin-panel">
   <div className="admin-heading">
