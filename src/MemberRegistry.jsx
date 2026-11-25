@@ -101,6 +101,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [fitpRecords, setFitpRecords] = useState([]);
   const [sportRecords, setSportRecords] = useState([]);
   const [medicalRecords, setMedicalRecords] = useState([]);
+  const [fitpEditing, setFitpEditing] = useState(false);
+  const [medicalEditing, setMedicalEditing] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -258,6 +260,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setFitpRecords([]);
     setSportRecords([]);
     setMedicalRecords([]);
+    setFitpEditing(false);
+    setMedicalEditing(false);
   }
 
   async function selectRecord(record) {
@@ -267,6 +271,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setError('');
     setForm(toForm(record));
     setSelectedCategoryIds(record.category_ids || []);
+    setFitpEditing(false);
+    setMedicalEditing(false);
     setContactEmail('');
     setContactPhone('');
     const emailResult = await supabase
@@ -355,6 +361,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setFitpRecords([]);
     setSportRecords([]);
     setMedicalRecords([]);
+    setFitpEditing(false);
+    setMedicalEditing(false);
     setNotice('');
     setError('');
   }
@@ -372,6 +380,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   }
 
   function addFitpRecord() {
+    setFitpEditing(true);
     setFitpRecords(previous => [...previous, {
       member_id: selectedId || null, card_number: '', card_type: '', sport_year: '',
       issue_date: '', expiry_date: '', classification: '', status: 'active', notes: ''
@@ -387,6 +396,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   }
 
   function addMedicalRecord() {
+    setMedicalEditing(true);
     setMedicalRecords(previous => [...previous, {
       member_id: selectedId || null, regularity_status: 'not_presented',
       presented_date: '', expiry_date: ''
@@ -696,6 +706,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setSaving(false);
     setNotice(creating ? 'Nuova scheda anagrafica creata.' : 'Scheda anagrafica aggiornata.');
     setCreating(false);
+    setFitpEditing(false);
+    setMedicalEditing(false);
     setSelectedId(result.data.id);
     setForm(toForm(result.data));
     setSelectedCategoryIds(selectedIds);
@@ -730,6 +742,27 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     );
   }
 
+  const todayLocal = new Date();
+  todayLocal.setHours(0, 0, 0, 0);
+  const daysToExpiry = expiryDate => {
+    if (!expiryDate) return null;
+    const [year, month, day] = String(expiryDate).slice(0, 10).split('-').map(Number);
+    if (!year || !month || !day) return null;
+    const expiry = new Date(year, month - 1, day);
+    return Math.ceil((expiry.getTime() - todayLocal.getTime()) / 86400000);
+  };
+  const currentFitp = fitpRecords.find(item => item.status !== 'cancelled') || null;
+  const fitpDaysLeft = daysToExpiry(currentFitp?.expiry_date);
+  const fitpNeedsRenewal = !!currentFitp && (
+    currentFitp.status === 'expired' ||
+    (fitpDaysLeft !== null && fitpDaysLeft <= 30)
+  );
+  const currentMedical = medicalRecords[0] || null;
+  const medicalDaysLeft = daysToExpiry(currentMedical?.expiry_date);
+  const medicalNeedsRenewal = !!currentMedical && (
+    ['expiring', 'expired', 'not_presented'].includes(currentMedical.regularity_status) ||
+    (medicalDaysLeft !== null && medicalDaysLeft <= 30)
+  );
   const linkedProfile = profileById.get(form.profile_id);
 
   return (
@@ -928,29 +961,34 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
               <div style={{display:'grid',gap:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
                   <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>TESSERAMENTO FITP</h4>
-                  <button type="button" className="password-button" onClick={addFitpRecord}
+                  <button type="button" className="password-button"
+                    onClick={() => {
+                      if (!currentFitp) addFitpRecord();
+                      else if (fitpNeedsRenewal) addFitpRecord();
+                      else setFitpEditing(true);
+                    }}
                     style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <Plus size={14}/> Aggiungi tesseramento
+                    <Plus size={14}/>{!currentFitp ? 'Inserisci tessera FITP' : fitpNeedsRenewal ? 'Inserisci rinnovo' : 'Modifica'}
                   </button>
                 </div>
                 {fitpRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessun tesseramento registrato.</p>}
                 {fitpRecords.map((item, index) => (
                   <div key={item.id || `fitp-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
-                    <strong style={{fontSize:12,color:'#405b43'}}>Tesseramento {index + 1}</strong>
+                    <strong style={{fontSize:12,color:'#405b43'}}>{index === 0 ? 'Tessera corrente' : `Storico tessera ${index}`}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
-                      <label style={labelStyle}>Numero tessera<input style={fieldStyle} value={item.card_number || ''} onChange={e=>updateFitpRecord(index,'card_number',e.target.value)}/></label>
-                      <label style={labelStyle}>Tipo tessera<input style={fieldStyle} value={item.card_type || ''} onChange={e=>updateFitpRecord(index,'card_type',e.target.value)} placeholder="Es. atleta"/></label>
-                      <label style={labelStyle}>Anno sportivo<input style={fieldStyle} type="number" value={item.sport_year || ''} onChange={e=>updateFitpRecord(index,'sport_year',e.target.value)}/></label>
-                      <label style={labelStyle}>Classificazione<input style={fieldStyle} value={item.classification || ''} onChange={e=>updateFitpRecord(index,'classification',e.target.value)}/></label>
-                      <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Numero tessera<input style={fieldStyle} value={item.card_number || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_number',e.target.value)}/></label>
+                      <label style={labelStyle}>Tipo tessera<input style={fieldStyle} value={item.card_type || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_type',e.target.value)} placeholder="Es. atleta"/></label>
+                      <label style={labelStyle}>Anno sportivo<input style={fieldStyle} type="number" value={item.sport_year || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'sport_year',e.target.value)}/></label>
+                      <label style={labelStyle}>Classificazione<input style={fieldStyle} value={item.classification || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'classification',e.target.value)}/></label>
+                      <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>
                       <label style={labelStyle}>Stato
-                        <select style={fieldStyle} value={item.status || 'active'} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
+                        <select style={fieldStyle} value={item.status || 'active'} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
                           <option value="active">Attiva</option><option value="expired">Scaduta</option><option value="pending">In attesa</option><option value="cancelled">Annullata</option>
                         </select>
                       </label>
                     </div>
-                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
+                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
                   </div>
                 ))}
               </div>
@@ -961,18 +999,22 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                     <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>CERTIFICATO MEDICO</h4>
                     <p className="muted" style={{margin:'4px 0 0',fontSize:11}}>Gestione riservata al super amministratore. Le registrazioni precedenti vengono conservate.</p>
                   </div>
-                  <button type="button" className="password-button" onClick={addMedicalRecord}
+                  <button type="button" className="password-button"
+                    onClick={() => {
+                      if (!currentMedical || medicalNeedsRenewal) addMedicalRecord();
+                      else setMedicalEditing(true);
+                    }}
                     style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <Plus size={14}/> Aggiungi certificato
+                    <Plus size={14}/>{!currentMedical ? 'Inserisci certificato' : medicalNeedsRenewal ? 'Inserisci rinnovo' : 'Modifica'}
                   </button>
                 </div>
                 {medicalRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessun certificato medico registrato.</p>}
                 {medicalRecords.map((item, index) => (
                   <div key={item.id || `medical-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
-                    <strong style={{fontSize:12,color:'#405b43'}}>Certificato {index + 1}{item.created_at ? ` · inserito il ${new Date(item.created_at).toLocaleDateString('it-IT')}` : ' · nuovo'}</strong>
+                    <strong style={{fontSize:12,color:'#405b43'}}>{index === 0 ? 'Certificato corrente' : `Storico certificato ${index}`}{item.created_at ? ` · inserito il ${new Date(item.created_at).toLocaleDateString('it-IT')}` : ' · nuovo'}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
                       <label style={labelStyle}>Stato di regolarità
-                        <select style={fieldStyle} value={item.regularity_status || 'not_presented'} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
+                        <select style={fieldStyle} value={item.regularity_status || 'not_presented'} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
                           <option value="regular">Regolare</option>
                           <option value="expiring">In scadenza</option>
                           <option value="expired">Scaduto</option>
@@ -980,8 +1022,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                           <option value="not_required">Non richiesto</option>
                         </select>
                       </label>
-                      <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>
                     </div>
                     {item.verified_at && <small className="muted">Ultima verifica: {new Date(item.verified_at).toLocaleString('it-IT')}</small>}
                   </div>
