@@ -999,14 +999,28 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                     <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>CERTIFICATO MEDICO</h4>
                     <p className="muted" style={{margin:'4px 0 0',fontSize:11}}>Gestione riservata al super amministratore. Le registrazioni precedenti vengono conservate.</p>
                   </div>
-                  <button type="button" className="password-button"
-                    onClick={() => {
-                      if (!currentMedical || medicalNeedsRenewal) addMedicalRecord();
-                      else setMedicalEditing(true);
-                    }}
-                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <Plus size={14}/>{!currentMedical ? 'Inserisci certificato' : medicalNeedsRenewal ? 'Inserisci rinnovo' : 'Modifica'}
-                  </button>
+                  {!currentMedical ? (
+                    <button type="button" className="password-button"
+                      onClick={addMedicalRecord}
+                      style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                      <Plus size={14}/>Inserisci certificato
+                    </button>
+                  ) : (
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                      <button type="button" className="password-button"
+                        onClick={() => setMedicalEditing(true)}
+                        style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                        Modifica
+                      </button>
+                      {medicalNeedsRenewal && (
+                        <button type="button" className="password-button"
+                          onClick={addMedicalRecord}
+                          style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                          <Plus size={14}/>Inserisci rinnovo
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {medicalRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessun certificato medico registrato.</p>}
                 {medicalRecords.map((item, index) => (
