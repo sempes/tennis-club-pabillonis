@@ -224,6 +224,7 @@ function App() {
   const [announcements,setAnnouncements] = useState([]);
   const [announcementReadIds,setAnnouncementReadIds] = useState([]);
   const [expiryAlertCount,setExpiryAlertCount] = useState(0);
+  const [expiryAlertItems,setExpiryAlertItems] = useState([]);
   const [selectedAnnouncement,setSelectedAnnouncement] = useState(null);
   const [announcementForm,setAnnouncementForm] = useState({
     title:'', content:'', category:'Avviso', is_pinned:false
@@ -493,6 +494,7 @@ const [savingRegulation,setSavingRegulation] = useState(false);
 
     if (!session || recoveryMode || !canViewExpiry) {
       setExpiryAlertCount(0);
+      setExpiryAlertItems([]);
       return;
     }
 
@@ -523,7 +525,19 @@ const [savingRegulation,setSavingRegulation] = useState(false);
         if (card.status === 'expired') return true;
         const days = daysUntil(card.expiry_date);
         return days !== null && days <= 30;
-      }).length;
+      }).map(card => {
+        const days = daysUntil(card.expiry_date);
+        const expired = card.status === 'expired' || (days !== null && days < 0);
+        return {
+          id: `fitp-${card.id}`,
+          type: 'FITP',
+          title: 'Tessera FITP',
+          memberName: card.member_name || '',
+          expiryDate: card.expiry_date,
+          statusLabel: expired ? 'Scaduta' : days !== null && days <= 7 ? 'In scadenza entro 7 giorni' : 'In scadenza entro 30 giorni',
+          severity: expired || (days !== null && days <= 7) ? 'urgent' : 'warning'
+        };
+      });
 
       const medicalAlerts = (medicalResult.data || []).filter(record => {
         if (record.status === 'not_required' || record.status === 'not_presented') return false;
@@ -533,9 +547,23 @@ const [savingRegulation,setSavingRegulation] = useState(false);
         if (days !== null && days <= 30) return true;
         return record.status === 'expiring' || record.notice_level === 'warning' ||
           record.notice_level === 'urgent';
-      }).length;
+      }).map(record => {
+        const days = daysUntil(record.expiry_date);
+        const expired = record.status === 'expired' || record.notice_level === 'expired' || (days !== null && days < 0);
+        return {
+          id: `medical-${record.id}`,
+          type: 'MEDICAL',
+          title: 'Certificato medico',
+          memberName: record.member_name || '',
+          expiryDate: record.expiry_date,
+          statusLabel: expired ? 'Scaduto' : days !== null && days <= 7 ? 'In scadenza entro 7 giorni' : 'In scadenza entro 30 giorni',
+          severity: expired || (days !== null && days <= 7) ? 'urgent' : 'warning'
+        };
+      });
 
-      setExpiryAlertCount(fitpAlerts + medicalAlerts);
+      const allExpiryAlerts = [...fitpAlerts, ...medicalAlerts];
+      setExpiryAlertItems(allExpiryAlerts);
+      setExpiryAlertCount(allExpiryAlerts.length);
     };
 
     countExpiryAlerts();
@@ -2126,8 +2154,8 @@ async function deleteAdmin(id){
         </div>
         <div className="top-actions">
           <button type="button" className="password-button"
-             onClick={() => setActiveView('announcements')}
-             aria-label="Apri aggiornamenti" title="Aggiornamenti"
+             onClick={() => setActiveView('notifications')}
+             aria-label="Apri notifiche" title="Notifiche"
              style={{position:'relative'}}>
              <Bell size={18}/>
              {(announcements.filter(item => !announcementReadIds.includes(item.id)).length + expiryAlertCount) > 0 &&
@@ -2352,6 +2380,47 @@ aria-label={
       </>}
 
       
+{activeView==='notifications'&&<section className="admin-panel" style={{display:'grid',gap:18}}>
+  <div className="admin-heading">
+    <div>
+      <span className="eyebrow">TENNIS CLUB PABILLONIS</span>
+      <h2>Centro notifiche</h2>
+      <p className="muted">Riepilogo degli aggiornamenti non letti e delle scadenze FITP e mediche.</p>
+    </div>
+    <Bell size={28}/>
+  </div>
+
+  <div style={{display:'grid',gap:10}}>
+    <h3 style={{margin:'4px 0',color:'#304338'}}>Scadenze FITP e certificati medici</h3>
+    {expiryAlertItems.length===0
+      ? <p className="muted" style={{padding:14,border:'1px solid #e1e8e1',borderRadius:12}}>Non ci sono scadenze da segnalare.</p>
+      : expiryAlertItems.map(item=><article key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #e1e8e1',borderRadius:13,background:'#fff'}}>
+          <div style={{display:'grid',gap:5,minWidth:0}}>
+            <strong style={{color:'#304338'}}>{item.title}{item.memberName ? ` · ${item.memberName}` : ''}</strong>
+            <span style={{fontSize:12,color:item.severity==='urgent'?'#a33b32':'#8a641b',fontWeight:800}}>{item.statusLabel}</span>
+            <small className="muted">Scadenza: {item.expiryDate ? new Date(`${item.expiryDate}T12:00:00`).toLocaleDateString('it-IT') : 'Non indicata'}</small>
+          </div>
+          <button type="button" className="password-button" onClick={()=>setActiveView('fitpExpiry')}>Apri scadenze</button>
+        </article>)}
+  </div>
+
+  <div style={{display:'grid',gap:10}}>
+    <h3 style={{margin:'4px 0',color:'#304338'}}>Aggiornamenti non letti</h3>
+    {announcements.filter(item=>!announcementReadIds.includes(item.id)).length===0
+      ? <p className="muted" style={{padding:14,border:'1px solid #e1e8e1',borderRadius:12}}>Non ci sono aggiornamenti non letti.</p>
+      : announcements.filter(item=>!announcementReadIds.includes(item.id)).map(item=><article key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #e1e8e1',borderRadius:13,background:'#f5f9f1'}}>
+          <div style={{display:'grid',gap:5,minWidth:0}}>
+            <strong style={{color:'#304338'}}>{item.title}</strong>
+            <small className="muted">{item.category} · {new Date(item.created_at).toLocaleDateString('it-IT')}</small>
+            <span style={{fontSize:13,color:'#526258'}}>{item.content.length>160 ? item.content.slice(0,160)+'…' : item.content}</span>
+          </div>
+          <button type="button" className="password-button" onClick={()=>openAnnouncement(item)}>Leggi aggiornamento</button>
+        </article>)}
+  </div>
+
+  <div><button type="button" className="password-button" onClick={()=>setActiveView('announcements')}>Apri tutta la bacheca</button></div>
+</section>}
+
 {activeView==='announcements'&&<section className="admin-panel">
   <div className="admin-heading">
     <div>
