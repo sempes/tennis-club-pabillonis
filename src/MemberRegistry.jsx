@@ -983,9 +983,17 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                       <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>
                       <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>
                       <label style={labelStyle}>Stato
-                        <select style={fieldStyle} value={item.status || 'active'} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
-                          <option value="active">Attiva</option><option value="expired">Scaduta</option><option value="pending">In attesa</option><option value="cancelled">Annullata</option>
-                        </select>
+                        {index === 0 && !fitpEditing ? (
+                          <div style={{...fieldStyle,display:'flex',alignItems:'center',minHeight:42,background:'#f8faf7'}}>
+                            {item.status === 'active' && fitpDaysLeft !== null && fitpDaysLeft < 0
+                              ? 'Scaduta'
+                              : ({active:'Attiva',expired:'Scaduta',pending:'In attesa',cancelled:'Annullata'}[item.status] || item.status || 'Attiva')}
+                          </div>
+                        ) : (
+                          <select style={fieldStyle} value={item.status || 'active'} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
+                            <option value="active">Attiva</option><option value="expired">Scaduta</option><option value="pending">In attesa</option><option value="cancelled">Annullata</option>
+                          </select>
+                        )}
                       </label>
                     </div>
                     <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
@@ -1028,13 +1036,25 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                     <strong style={{fontSize:12,color:'#405b43'}}>{index === 0 ? 'Certificato corrente' : `Storico certificato ${index}`}{item.created_at ? ` · inserito il ${new Date(item.created_at).toLocaleDateString('it-IT')}` : ' · nuovo'}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
                       <label style={labelStyle}>Stato di regolarità
-                        <select style={fieldStyle} value={item.regularity_status || 'not_presented'} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
-                          <option value="regular">Regolare</option>
-                          <option value="expiring">In scadenza</option>
-                          <option value="expired">Scaduto</option>
-                          <option value="not_presented">Non presentato</option>
-                          <option value="not_required">Non richiesto</option>
-                        </select>
+                        {index === 0 && !medicalEditing ? (
+                          <div style={{...fieldStyle,display:'flex',alignItems:'center',minHeight:42,background:'#f8faf7'}}>
+                            {['not_presented','not_required'].includes(item.regularity_status)
+                              ? (item.regularity_status === 'not_presented' ? 'Non presentato' : 'Non richiesto')
+                              : medicalDaysLeft !== null && medicalDaysLeft < 0
+                                ? 'Scaduto'
+                                : medicalDaysLeft !== null && medicalDaysLeft <= 30
+                                  ? 'In scadenza'
+                                  : ({regular:'Regolare',expiring:'In scadenza',expired:'Scaduto'}[item.regularity_status] || item.regularity_status || 'Non presentato')}
+                          </div>
+                        ) : (
+                          <select style={fieldStyle} value={item.regularity_status || 'not_presented'} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
+                            <option value="regular">Regolare</option>
+                            <option value="expiring">In scadenza</option>
+                            <option value="expired">Scaduto</option>
+                            <option value="not_presented">Non presentato</option>
+                            <option value="not_required">Non richiesto</option>
+                          </select>
+                        )}
                       </label>
                       <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>
                       <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>
