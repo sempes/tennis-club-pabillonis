@@ -78,7 +78,7 @@ function SelectField({ label, name, value, onChange, children }) {
   );
 }
 
-export default function MemberRegistry({ profile, members = [] }) {
+export default function MemberRegistry({ profile, members = [], onRegistrySaved }) {
   const [records, setRecords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
@@ -267,6 +267,12 @@ export default function MemberRegistry({ profile, members = [] }) {
     setSelectedId(result.data.id);
     setForm(toForm(result.data));
     await loadRegistry(true);
+
+    // Se è stato modificato lo stato associativo di un socio collegato,
+    // aggiorna subito Gestione soci senza ricaricare tutta l'app.
+    if (typeof onRegistrySaved === 'function') {
+      await onRegistrySaved();
+    }
   }
 
   if (!authorized) {
