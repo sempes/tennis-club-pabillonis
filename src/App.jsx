@@ -223,6 +223,7 @@ function App() {
   // Stato separato della bacheca: non modifica i dati delle prenotazioni.
   const [announcements,setAnnouncements] = useState([]);
   const [announcementReadIds,setAnnouncementReadIds] = useState([]);
+  const [expiryAlertCount,setExpiryAlertCount] = useState(0);
   const [selectedAnnouncement,setSelectedAnnouncement] = useState(null);
   const [announcementForm,setAnnouncementForm] = useState({
     title:'', content:'', category:'Avviso', is_pinned:false
@@ -482,6 +483,72 @@ const [savingRegulation,setSavingRegulation] = useState(false);
       window.removeEventListener('focus', handleFocus);
     };
   }, [session?.user?.id, recoveryMode]);
+
+
+  // Conteggio scadenze FITP e mediche per la campanella.
+  // La bacheca mantiene il proprio conteggio e comportamento indipendenti.
+  useEffect(() => {
+    const canViewExpiry = profile?.status === 'active' &&
+      (profile?.role === 'member' || profile?.role === 'super_admin');
+
+    if (!session || recoveryMode || !canViewExpiry) {
+      setExpiryAlertCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const countExpiryAlerts = async () => {
+      const [fitpResult, medicalResult] = await Promise.all([
+        supabase.rpc('get_fitp_expiry_overview'),
+        supabase.rpc('get_medical_expiry_overview')
+      ]);
+
+      if (cancelled) return;
+      if (fitpResult.error || medicalResult.error) {
+        console.error('Errore conteggio scadenze:', fitpResult.error || medicalResult.error);
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysUntil = value => {
+        if (!value) return null;
+        const expiry = new Date(`${value}T00:00:00`);
+        return Math.round((expiry - today) / 86400000);
+      };
+
+      const fitpAlerts = (fitpResult.data || []).filter(card => {
+        if (card.status === 'cancelled') return false;
+        if (card.status === 'expired') return true;
+        const days = daysUntil(card.expiry_date);
+        return days !== null && days <= 30;
+      }).length;
+
+      const medicalAlerts = (medicalResult.data || []).filter(record => {
+        if (record.status === 'not_required' || record.status === 'not_presented') return false;
+        if (record.notice_level === 'not_required' || record.notice_level === 'not_presented') return false;
+        if (record.status === 'expired' || record.notice_level === 'expired') return true;
+        const days = daysUntil(record.expiry_date);
+        if (days !== null && days <= 30) return true;
+        return record.status === 'expiring' || record.notice_level === 'warning' ||
+          record.notice_level === 'urgent';
+      }).length;
+
+      setExpiryAlertCount(fitpAlerts + medicalAlerts);
+    };
+
+    countExpiryAlerts();
+    const intervalId = window.setInterval(countExpiryAlerts, 60000);
+    const handleFocus = () => countExpiryAlerts();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [session?.user?.id, recoveryMode, profile?.role, profile?.status]);
 
   async function saveRegulation() {
   if (!isAdmin || !session) return;
@@ -2063,7 +2130,7 @@ async function deleteAdmin(id){
              aria-label="Apri aggiornamenti" title="Aggiornamenti"
              style={{position:'relative'}}>
              <Bell size={18}/>
-             {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
+             {(announcements.filter(item => !announcementReadIds.includes(item.id)).length + expiryAlertCount) > 0 &&
                <span style={{
                  position:'absolute', top:'-6px', right:'-6px',
                  minWidth:'18px', height:'18px', padding:'0 4px',
@@ -2071,7 +2138,7 @@ async function deleteAdmin(id){
                  display:'flex', alignItems:'center', justifyContent:'center',
                  fontSize:'10px', fontWeight:800, border:'2px solid #fff'
                }}>
-                 {announcements.filter(item => !announcementReadIds.includes(item.id)).length}
+                 {announcements.filter(item => !announcementReadIds.includes(item.id)).length + expiryAlertCount}
                </span>
              }
            </button>
