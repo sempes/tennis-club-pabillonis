@@ -137,12 +137,22 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   }
 
   function toForm(record) {
-    return Object.fromEntries(
+    const values = Object.fromEntries(
       Object.keys(emptyMember).map(key => [
         key,
         record?.[key] == null ? '' : String(record[key])
       ])
     );
+
+    // Per le schede importate in precedenza, ricava nome e cognome
+    // da full_name soltanto quando i campi separati sono vuoti.
+    if ((!values.first_name || !values.last_name) && values.full_name.trim()) {
+      const parts = values.full_name.trim().split(/\s+/);
+      if (!values.first_name) values.first_name = parts.shift() || '';
+      if (!values.last_name) values.last_name = parts.join(' ');
+    }
+
+    return values;
   }
 
   useEffect(() => {
@@ -187,16 +197,18 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 
   function changeField(event) {
     const { name, value } = event.target;
-    setForm(previous => ({ ...previous, [name]: value }));
-    if (name === 'full_name') {
-      const parts = value.trim().split(/\s+/);
-      setForm(previous => ({
-        ...previous,
-        full_name: value,
-        first_name: parts.length ? parts[0] : '',
-        last_name: parts.length > 1 ? parts.slice(1).join(' ') : ''
-      }));
-    }
+
+    setForm(previous => {
+      const next = { ...previous, [name]: value };
+
+      if (name === 'first_name' || name === 'last_name') {
+        next.full_name = [next.first_name.trim(), next.last_name.trim()]
+          .filter(Boolean)
+          .join(' ');
+      }
+
+      return next;
+    });
   }
 
   function cancelEdit() {
@@ -211,9 +223,12 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     event.preventDefault();
     if (!authorized || saving) return;
 
-    const fullName = form.full_name.trim();
-    if (!fullName) {
-      setError('Inserisci almeno nome e cognome.');
+    const firstName = form.first_name.trim();
+    const lastName = form.last_name.trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+
+    if (!firstName || !lastName) {
+      setError('Inserisci sia il nome sia il cognome.');
       return;
     }
 
@@ -413,9 +428,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
               <div>
                 <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>DATI PERSONALI</h4>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
-                  <Field label="Nome e cognome *" name="full_name" value={form.full_name} onChange={changeField}/>
-                  <Field label="Nome" name="first_name" value={form.first_name} onChange={changeField}/>
-                  <Field label="Cognome" name="last_name" value={form.last_name} onChange={changeField}/>
+                  <Field label="Nome *" name="first_name" value={form.first_name} onChange={changeField} required/>
+                  <Field label="Cognome *" name="last_name" value={form.last_name} onChange={changeField} required/>
                   <Field label="Data di nascita" name="birth_date" type="date" value={form.birth_date} onChange={changeField}/>
                   <Field label="Luogo di nascita" name="birth_place" value={form.birth_place} onChange={changeField}/>
                   <Field label="Codice fiscale" name="tax_code" value={form.tax_code} onChange={changeField} maxLength={32}/>
