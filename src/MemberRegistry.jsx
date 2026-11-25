@@ -38,7 +38,7 @@ function surnameFirstLabel(record) {
     return [last, first].filter(Boolean).join(' ') || 'Nome da completare';
   }
 
-  const parts = (record.full_name || '').trim().split(/\\s+/).filter(Boolean);
+  const parts = (record.full_name || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return record.full_name || 'Nome da completare';
   const givenName = parts.shift();
   return `${parts.join(' ')} ${givenName}`;
