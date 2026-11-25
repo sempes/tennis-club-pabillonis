@@ -98,6 +98,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [fitpRecords, setFitpRecords] = useState([]);
+  const [sportRecords, setSportRecords] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -252,6 +254,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setSelectedCategoryIds([]);
     setContactEmail('');
     setContactPhone('');
+    setFitpRecords([]);
+    setSportRecords([]);
   }
 
   async function selectRecord(record) {
@@ -291,6 +295,23 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     } else {
       setContactPhone(phoneResult.data?.value || '');
     }
+
+    const [fitpResult, sportsResult] = await Promise.all([
+      supabase.from('member_fitp').select('*').eq('member_id', record.id).order('sport_year', { ascending: false }),
+      supabase.from('member_sports').select('*').eq('member_id', record.id).order('start_date', { ascending: false })
+    ]);
+    if (fitpResult.error) {
+      setError(previous => [previous, 'Impossibile caricare i tesseramenti FITP: ' + fitpResult.error.message]
+        .filter(Boolean).join(' · '));
+    } else {
+      setFitpRecords(fitpResult.data || []);
+    }
+    if (sportsResult.error) {
+      setError(previous => [previous, 'Impossibile caricare le attività sportive: ' + sportsResult.error.message]
+        .filter(Boolean).join(' · '));
+    } else {
+      setSportRecords(sportsResult.data || []);
+    }
   }
 
   function toggleCategory(categoryId) {
@@ -322,8 +343,33 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setSelectedCategoryIds([]);
     setContactEmail('');
     setContactPhone('');
+    setFitpRecords([]);
+    setSportRecords([]);
     setNotice('');
     setError('');
+  }
+
+  function updateFitpRecord(index, field, value) {
+    setFitpRecords(previous => previous.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  function updateSportRecord(index, field, value) {
+    setSportRecords(previous => previous.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  function addFitpRecord() {
+    setFitpRecords(previous => [...previous, {
+      member_id: selectedId || null, card_number: '', card_type: '', sport_year: '',
+      issue_date: '', expiry_date: '', classification: '', status: 'active', notes: ''
+    }]);
+  }
+
+  function addSportRecord() {
+    setSportRecords(previous => [...previous, {
+      member_id: selectedId || null, activity_type: 'course', title: '', season: '',
+      coach_name: '', playing_level: '', competitive: false, start_date: '',
+      end_date: '', status: 'active', notes: ''
+    }]);
   }
 
   async function saveRecord(event) {
@@ -544,12 +590,76 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       }
     }
 
+    // Salva lo storico dei tesseramenti FITP. Le righe esistenti vengono
+    // aggiornate e quelle nuove inserite; non vengono cancellati gli anni precedenti.
+    for (const item of fitpRecords) {
+      const cardNumber = (item.card_number || '').trim();
+      const cardType = (item.card_type || '').trim();
+      if (!cardNumber && !cardType && !item.sport_year && !item.issue_date && !item.expiry_date
+          && !item.classification && !item.notes) continue;
+      const fitpPayload = {
+        member_id: memberId,
+        card_number: cardNumber || null,
+        card_type: cardType || null,
+        sport_year: item.sport_year ? Number(item.sport_year) : null,
+        issue_date: item.issue_date || null,
+        expiry_date: item.expiry_date || null,
+        classification: (item.classification || '').trim() || null,
+        status: item.status || 'active',
+        notes: (item.notes || '').trim() || null
+      };
+      const fitpSave = item.id
+        ? await supabase.from('member_fitp').update(fitpPayload).eq('id', item.id)
+        : await supabase.from('member_fitp').insert(fitpPayload);
+      if (fitpSave.error) {
+        setSaving(false);
+        setError('Scheda salvata, ma errore nel tesseramento FITP: ' + fitpSave.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
+
+    // Le attività vengono conservate come storico: non si eliminano
+    // automaticamente le attività precedenti.
+    for (const item of sportRecords) {
+      const title = (item.title || '').trim();
+      if (!title) continue;
+      const sportPayload = {
+        member_id: memberId,
+        activity_type: item.activity_type || 'other',
+        title,
+        season: (item.season || '').trim() || null,
+        coach_name: (item.coach_name || '').trim() || null,
+        playing_level: (item.playing_level || '').trim() || null,
+        competitive: item.competitive === true || item.competitive === 'true',
+        start_date: item.start_date || null,
+        end_date: item.end_date || null,
+        status: item.status || 'active',
+        notes: (item.notes || '').trim() || null
+      };
+      const sportSave = item.id
+        ? await supabase.from('member_sports').update(sportPayload).eq('id', item.id)
+        : await supabase.from('member_sports').insert(sportPayload);
+      if (sportSave.error) {
+        setSaving(false);
+        setError('Scheda salvata, ma errore nell’attività sportiva: ' + sportSave.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
+
     setSaving(false);
     setNotice(creating ? 'Nuova scheda anagrafica creata.' : 'Scheda anagrafica aggiornata.');
     setCreating(false);
     setSelectedId(result.data.id);
     setForm(toForm(result.data));
     setSelectedCategoryIds(selectedIds);
+    const [savedFitp, savedSports] = await Promise.all([
+      supabase.from('member_fitp').select('*').eq('member_id', memberId).order('sport_year', { ascending: false }),
+      supabase.from('member_sports').select('*').eq('member_id', memberId).order('start_date', { ascending: false })
+    ]);
+    if (!savedFitp.error) setFitpRecords(savedFitp.data || []);
+    if (!savedSports.error) setSportRecords(savedSports.data || []);
     await loadRegistry(true);
 
     // Se è stato modificato lo stato associativo di un socio collegato,
@@ -766,6 +876,75 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div style={{display:'grid',gap:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+                  <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>TESSERAMENTO FITP</h4>
+                  <button type="button" className="password-button" onClick={addFitpRecord}
+                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                    <Plus size={14}/> Aggiungi tesseramento
+                  </button>
+                </div>
+                {fitpRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessun tesseramento registrato.</p>}
+                {fitpRecords.map((item, index) => (
+                  <div key={item.id || `fitp-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
+                    <strong style={{fontSize:12,color:'#405b43'}}>Tesseramento {index + 1}</strong>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+                      <label style={labelStyle}>Numero tessera<input style={fieldStyle} value={item.card_number || ''} onChange={e=>updateFitpRecord(index,'card_number',e.target.value)}/></label>
+                      <label style={labelStyle}>Tipo tessera<input style={fieldStyle} value={item.card_type || ''} onChange={e=>updateFitpRecord(index,'card_type',e.target.value)} placeholder="Es. atleta"/></label>
+                      <label style={labelStyle}>Anno sportivo<input style={fieldStyle} type="number" value={item.sport_year || ''} onChange={e=>updateFitpRecord(index,'sport_year',e.target.value)}/></label>
+                      <label style={labelStyle}>Classificazione<input style={fieldStyle} value={item.classification || ''} onChange={e=>updateFitpRecord(index,'classification',e.target.value)}/></label>
+                      <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Stato
+                        <select style={fieldStyle} value={item.status || 'active'} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
+                          <option value="active">Attiva</option><option value="expired">Scaduta</option><option value="pending">In attesa</option><option value="cancelled">Annullata</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{display:'grid',gap:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+                  <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>ATTIVITÀ SPORTIVE</h4>
+                  <button type="button" className="password-button" onClick={addSportRecord}
+                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                    <Plus size={14}/> Aggiungi attività
+                  </button>
+                </div>
+                {sportRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessuna attività registrata.</p>}
+                {sportRecords.map((item, index) => (
+                  <div key={item.id || `sport-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
+                    <strong style={{fontSize:12,color:'#405b43'}}>Attività {index + 1}</strong>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+                      <label style={labelStyle}>Tipo attività
+                        <select style={fieldStyle} value={item.activity_type || 'course'} onChange={e=>updateSportRecord(index,'activity_type',e.target.value)}>
+                          <option value="course">Corso</option><option value="lesson">Lezione</option><option value="team">Squadra</option><option value="tournament">Torneo</option><option value="competition">Competizione</option><option value="other">Altro</option>
+                        </select>
+                      </label>
+                      <label style={labelStyle}>Nome attività<input style={fieldStyle} value={item.title || ''} onChange={e=>updateSportRecord(index,'title',e.target.value)} placeholder="Nome attività" /></label>
+                      <label style={labelStyle}>Stagione sportiva<input style={fieldStyle} value={item.season || ''} onChange={e=>updateSportRecord(index,'season',e.target.value)} placeholder="Es. 2026/2027"/></label>
+                      <label style={labelStyle}>Istruttore<input style={fieldStyle} value={item.coach_name || ''} onChange={e=>updateSportRecord(index,'coach_name',e.target.value)}/></label>
+                      <label style={labelStyle}>Livello di gioco<input style={fieldStyle} value={item.playing_level || ''} onChange={e=>updateSportRecord(index,'playing_level',e.target.value)}/></label>
+                      <label style={labelStyle}>Data inizio<input style={fieldStyle} type="date" value={item.start_date || ''} onChange={e=>updateSportRecord(index,'start_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Data fine<input style={fieldStyle} type="date" value={item.end_date || ''} onChange={e=>updateSportRecord(index,'end_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Stato
+                        <select style={fieldStyle} value={item.status || 'active'} onChange={e=>updateSportRecord(index,'status',e.target.value)}>
+                          <option value="active">Attiva</option><option value="completed">Completata</option><option value="cancelled">Annullata</option>
+                        </select>
+                      </label>
+                      <label style={{...labelStyle,display:'flex',alignItems:'center',gap:8,alignSelf:'end',padding:'10px 0'}}>
+                        <input type="checkbox" checked={!!item.competitive} onChange={e=>updateSportRecord(index,'competitive',e.target.checked)} style={{accentColor:'#557b42',width:16,height:16}}/>
+                        Attività agonistica
+                      </label>
+                    </div>
+                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateSportRecord(index,'notes',e.target.value)}/></label>
+                  </div>
+                ))}
               </div>
 
               <label style={labelStyle}>
