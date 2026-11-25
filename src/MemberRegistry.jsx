@@ -100,6 +100,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [contactPhone, setContactPhone] = useState('');
   const [fitpRecords, setFitpRecords] = useState([]);
   const [sportRecords, setSportRecords] = useState([]);
+  const [medicalRecords, setMedicalRecords] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState(null);
@@ -256,6 +257,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setContactPhone('');
     setFitpRecords([]);
     setSportRecords([]);
+    setMedicalRecords([]);
   }
 
   async function selectRecord(record) {
@@ -296,9 +298,10 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       setContactPhone(phoneResult.data?.value || '');
     }
 
-    const [fitpResult, sportsResult] = await Promise.all([
+    const [fitpResult, sportsResult, medicalResult] = await Promise.all([
       supabase.from('member_fitp').select('*').eq('member_id', record.id).order('sport_year', { ascending: false }),
-      supabase.from('member_sports').select('*').eq('member_id', record.id).order('start_date', { ascending: false })
+      supabase.from('member_sports').select('*').eq('member_id', record.id).order('start_date', { ascending: false }),
+      supabase.from('member_medical').select('*').eq('member_id', record.id).order('created_at', { ascending: false })
     ]);
     if (fitpResult.error) {
       setError(previous => [previous, 'Impossibile caricare i tesseramenti FITP: ' + fitpResult.error.message]
@@ -311,6 +314,12 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
         .filter(Boolean).join(' · '));
     } else {
       setSportRecords(sportsResult.data || []);
+    }
+    if (medicalResult.error) {
+      setError(previous => [previous, 'Impossibile caricare i certificati medici: ' + medicalResult.error.message]
+        .filter(Boolean).join(' · '));
+    } else {
+      setMedicalRecords(medicalResult.data || []);
     }
   }
 
@@ -345,6 +354,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setContactPhone('');
     setFitpRecords([]);
     setSportRecords([]);
+    setMedicalRecords([]);
     setNotice('');
     setError('');
   }
@@ -355,6 +365,10 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 
   function updateSportRecord(index, field, value) {
     setSportRecords(previous => previous.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  function updateMedicalRecord(index, field, value) {
+    setMedicalRecords(previous => previous.map((item, i) => i === index ? { ...item, [field]: value } : item));
   }
 
   function addFitpRecord() {
@@ -369,6 +383,13 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       member_id: selectedId || null, activity_type: 'course', title: '', season: '',
       coach_name: '', playing_level: '', competitive: false, start_date: '',
       end_date: '', status: 'active', notes: ''
+    }]);
+  }
+
+  function addMedicalRecord() {
+    setMedicalRecords(previous => [...previous, {
+      member_id: selectedId || null, regularity_status: 'not_presented',
+      presented_date: '', expiry_date: ''
     }]);
   }
 
@@ -648,18 +669,44 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       }
     }
 
+    // Salva lo storico dei certificati medici: le nuove righe vengono
+    // inserite e quelle esistenti aggiornate, senza cancellare certificati precedenti.
+    for (const item of medicalRecords) {
+      const status = item.regularity_status || 'not_presented';
+      const medicalPayload = {
+        member_id: memberId,
+        regularity_status: status,
+        presented_date: item.presented_date || null,
+        expiry_date: item.expiry_date || null,
+        verified_by: profile.id,
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const medicalSave = item.id
+        ? await supabase.from('member_medical').update(medicalPayload).eq('id', item.id)
+        : await supabase.from('member_medical').insert(medicalPayload);
+      if (medicalSave.error) {
+        setSaving(false);
+        setError('Scheda salvata, ma errore nel certificato medico: ' + medicalSave.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
+
     setSaving(false);
     setNotice(creating ? 'Nuova scheda anagrafica creata.' : 'Scheda anagrafica aggiornata.');
     setCreating(false);
     setSelectedId(result.data.id);
     setForm(toForm(result.data));
     setSelectedCategoryIds(selectedIds);
-    const [savedFitp, savedSports] = await Promise.all([
+    const [savedFitp, savedSports, savedMedical] = await Promise.all([
       supabase.from('member_fitp').select('*').eq('member_id', memberId).order('sport_year', { ascending: false }),
-      supabase.from('member_sports').select('*').eq('member_id', memberId).order('start_date', { ascending: false })
+      supabase.from('member_sports').select('*').eq('member_id', memberId).order('start_date', { ascending: false }),
+      supabase.from('member_medical').select('*').eq('member_id', memberId).order('created_at', { ascending: false })
     ]);
     if (!savedFitp.error) setFitpRecords(savedFitp.data || []);
     if (!savedSports.error) setSportRecords(savedSports.data || []);
+    if (!savedMedical.error) setMedicalRecords(savedMedical.data || []);
     await loadRegistry(true);
 
     // Se è stato modificato lo stato associativo di un socio collegato,
@@ -904,6 +951,39 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
                       </label>
                     </div>
                     <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{display:'grid',gap:12}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+                  <div>
+                    <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>CERTIFICATO MEDICO</h4>
+                    <p className="muted" style={{margin:'4px 0 0',fontSize:11}}>Gestione riservata al super amministratore. Le registrazioni precedenti vengono conservate.</p>
+                  </div>
+                  <button type="button" className="password-button" onClick={addMedicalRecord}
+                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                    <Plus size={14}/> Aggiungi certificato
+                  </button>
+                </div>
+                {medicalRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessun certificato medico registrato.</p>}
+                {medicalRecords.map((item, index) => (
+                  <div key={item.id || `medical-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
+                    <strong style={{fontSize:12,color:'#405b43'}}>Certificato {index + 1}{item.created_at ? ` · inserito il ${new Date(item.created_at).toLocaleDateString('it-IT')}` : ' · nuovo'}</strong>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
+                      <label style={labelStyle}>Stato di regolarità
+                        <select style={fieldStyle} value={item.regularity_status || 'not_presented'} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
+                          <option value="regular">Regolare</option>
+                          <option value="expiring">In scadenza</option>
+                          <option value="expired">Scaduto</option>
+                          <option value="not_presented">Non presentato</option>
+                          <option value="not_required">Non richiesto</option>
+                        </select>
+                      </label>
+                      <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>
+                      <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>
+                    </div>
+                    {item.verified_at && <small className="muted">Ultima verifica: {new Date(item.verified_at).toLocaleString('it-IT')}</small>}
                   </div>
                 ))}
               </div>
