@@ -24,12 +24,45 @@ const STANDARD_REGISTRY_FIELDS = [
   { section: 'Dati associativi', fields: [
     ['enrollment_date', 'Data iscrizione'], ['membership_end_date', 'Fine iscrizione'],
     ['membership_status', 'Stato socio'], ['category_id', 'Categorie associative']
+  ]},
+  { section: 'Tesseramento FITP', fields: [
+    ['fitp_card_number', 'Numero tessera'], ['fitp_card_type', 'Tipo tessera'],
+    ['fitp_sport_year', 'Anno sportivo'], ['fitp_classification', 'Classificazione'],
+    ['fitp_issue_date', 'Data emissione'], ['fitp_expiry_date', 'Scadenza'],
+    ['fitp_status', 'Stato tessera'], ['fitp_notes', 'Note tessera']
+  ]},
+  { section: 'Certificato medico', fields: [
+    ['medical_regularity_status', 'Stato di regolarità'],
+    ['medical_presented_date', 'Data presentazione'],
+    ['medical_expiry_date', 'Data scadenza'],
+    ['medical_verified_at', 'Data ultima verifica']
+  ]},
+  { section: 'Attività sportive', fields: [
+    ['sport_activity_type', 'Tipo attività'], ['sport_title', 'Nome attività'],
+    ['sport_season', 'Stagione sportiva'], ['sport_coach_name', 'Istruttore'],
+    ['sport_playing_level', 'Livello di gioco'], ['sport_start_date', 'Data inizio'],
+    ['sport_end_date', 'Data fine'], ['sport_status', 'Stato attività'],
+    ['sport_competitive', 'Attività agonistica'], ['sport_notes', 'Note attività']
+  ]},
+  { section: 'Note interne', fields: [
+    ['internal_notes', 'Note interne']
   ]}
 ];
 
-const DEFAULT_STANDARD_FIELD_VISIBILITY = Object.fromEntries(
-  STANDARD_REGISTRY_FIELDS.flatMap(group => group.fields.map(([key]) => [key, true]))
-);
+const SECTION_VISIBILITY_KEYS = {
+  'Tesseramento FITP': 'section_fitp_enabled',
+  'Certificato medico': 'section_medical_enabled',
+  'Attività sportive': 'section_sport_enabled'
+};
+
+const DEFAULT_STANDARD_FIELD_VISIBILITY = {
+  ...Object.fromEntries(
+    STANDARD_REGISTRY_FIELDS.flatMap(group => group.fields.map(([key]) => [key, true]))
+  ),
+  section_fitp_enabled: true,
+  section_medical_enabled: true,
+  section_sport_enabled: true
+};
 
 const emptyMember = {
   profile_id: '',
@@ -876,7 +909,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
           <div>
             <span className="eyebrow">GESTIONE RISERVATA · TENNIS CLUB PABILLONIS</span>
             <h2 style={{marginBottom:5}}>Configurazione anagrafica</h2>
-            <p className="muted" style={{margin:0}}>Gestisci la visibilità dei campi standard e consulta i campi personalizzati.</p>
+            <p className="muted" style={{margin:0}}>Gestisci singolarmente la visibilità di tutti i campi e delle sezioni della scheda socio.</p>
           </div>
           <button type="button" className="password-button" onClick={()=>setConfigurationOpen(false)}
             style={{display:'inline-flex',alignItems:'center',gap:7}}>
@@ -894,25 +927,42 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
 
         <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:14}}>
           <div>
-            <h3 style={{margin:0,fontSize:16}}>Campi standard dell'anagrafica</h3>
+            <h3 style={{margin:0,fontSize:16}}>Tutti i campi della scheda socio</h3>
             <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Attiva o disattiva la visualizzazione dei singoli campi. Le modifiche non cancellano i dati.</p>
           </div>
-          {STANDARD_REGISTRY_FIELDS.map(group => (
-            <div key={group.section} style={{display:'grid',gap:8}}>
-              <h4 style={{margin:0,fontSize:12,letterSpacing:'.06em',color:'#557b42'}}>{group.section.toUpperCase()}</h4>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8}}>
-                {group.fields.map(([key, label]) => (
-                  <label key={key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 12px',border:'1px solid #e7ece5',borderRadius:10,background:'#fbfcfa',color:'#304338',fontSize:13}}>
-                    <span>{label}</span>
-                    <input type="checkbox" checked={standardFieldVisibility[key] !== false} onChange={event => {
-                      setStandardFieldVisibility(current => ({...current, [key]: event.target.checked}));
-                      setConfigurationNotice('');
-                    }} style={{width:17,height:17,accentColor:'#557b42'}} />
-                  </label>
-                ))}
+          {STANDARD_REGISTRY_FIELDS.map(group => {
+            const sectionKey = SECTION_VISIBILITY_KEYS[group.section];
+            const isWholeSection = !!sectionKey;
+            const sectionEnabled = !isWholeSection || standardFieldVisibility[sectionKey] !== false;
+            return (
+              <div key={group.section} style={{display:'grid',gap:8,padding:12,border:'1px solid #e7ece5',borderRadius:12,background:'#fff'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+                  <h4 style={{margin:0,fontSize:12,letterSpacing:'.06em',color:'#557b42'}}>{group.section.toUpperCase()}</h4>
+                  {isWholeSection && (
+                    <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:700,color:sectionEnabled?'#3f6c37':'#8a4b43'}}>
+                      <input type="checkbox" checked={sectionEnabled} onChange={event => {
+                        setStandardFieldVisibility(current => ({...current, [sectionKey]: event.target.checked}));
+                        setConfigurationNotice('');
+                      }} style={{width:17,height:17,accentColor:'#557b42'}} />
+                      Sezione intera attiva
+                    </label>
+                  )}
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8,opacity:sectionEnabled?1:.48}}>
+                  {group.fields.map(([key, label]) => (
+                    <label key={key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 12px',border:'1px solid #e7ece5',borderRadius:10,background:'#fbfcfa',color:'#304338',fontSize:13}}>
+                      <span>{label}</span>
+                      <input type="checkbox" checked={standardFieldVisibility[key] !== false} onChange={event => {
+                        setStandardFieldVisibility(current => ({...current, [key]: event.target.checked}));
+                        setConfigurationNotice('');
+                      }} style={{width:17,height:17,accentColor:'#557b42'}} />
+                    </label>
+                  ))}
+                </div>
+                {isWholeSection && !sectionEnabled && <small className="muted">L'intera sezione sarà nascosta nella scheda socio. I dati e lo storico resteranno conservati.</small>}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div style={{display:'flex',justifyContent:'flex-end'}}>
             <button type="button" className="password-button" onClick={saveStandardFieldVisibility} disabled={configurationSaving || configurationLoading}
               style={{display:'inline-flex',alignItems:'center',gap:7}}>
@@ -935,7 +985,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
 
           {configurationLoading ? <p className="muted">Lettura configurazione…</p>
             : configurationFields.length === 0
-              ? <p className="muted" style={{margin:0}}>Nessun campo personalizzato presente. I campi standard saranno gestiti nel passaggio successivo.</p>
+              ? <p className="muted" style={{margin:0}}>Nessun campo personalizzato presente. Non sono presenti campi personalizzati.</p>
               : <div style={{display:'grid',gap:8}}>
                   {configurationFields.map(item => (
                     <div key={item.id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:12,border:'1px solid #e7ece5',borderRadius:11,background:'#fbfcfa'}}>
@@ -1139,7 +1189,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                 );
               })}
 
-              <div style={{display:'grid',gap:12}}>
+              {standardFieldVisibility.section_fitp_enabled !== false && ['fitp_card_number','fitp_card_type','fitp_sport_year','fitp_classification','fitp_issue_date','fitp_expiry_date','fitp_status','fitp_notes'].some(showStandardField) && <div style={{display:'grid',gap:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
                   <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>TESSERAMENTO FITP</h4>
                   <button type="button" className="password-button"
@@ -1147,8 +1197,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                       if (!currentFitp) addFitpRecord();
                       else if (fitpNeedsRenewal) addFitpRecord();
                       else setFitpEditing(true);
-                    }}
-                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                    }} style={{display:'inline-flex',alignItems:'center',gap:6}}>
                     <Plus size={14}/>{!currentFitp ? 'Inserisci tessera FITP' : fitpNeedsRenewal ? 'Inserisci rinnovo' : 'Modifica'}
                   </button>
                 </div>
@@ -1157,57 +1206,41 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                   <div key={item.id || `fitp-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
                     <strong style={{fontSize:12,color:'#405b43'}}>{index === 0 ? 'Tessera corrente' : `Storico tessera ${index}`}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
-                      <label style={labelStyle}>Numero tessera<input style={fieldStyle} value={item.card_number || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_number',e.target.value)}/></label>
-                      <label style={labelStyle}>Tipo tessera<input style={fieldStyle} value={item.card_type || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_type',e.target.value)} placeholder="Es. atleta"/></label>
-                      <label style={labelStyle}>Anno sportivo<input style={fieldStyle} type="number" value={item.sport_year || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'sport_year',e.target.value)}/></label>
-                      <label style={labelStyle}>Classificazione<input style={fieldStyle} value={item.classification || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'classification',e.target.value)}/></label>
-                      <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Stato
+                      {showStandardField('fitp_card_number') && <label style={labelStyle}>Numero tessera<input style={fieldStyle} value={item.card_number || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_number',e.target.value)}/></label>}
+                      {showStandardField('fitp_card_type') && <label style={labelStyle}>Tipo tessera<input style={fieldStyle} value={item.card_type || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'card_type',e.target.value)} placeholder="Es. atleta"/></label>}
+                      {showStandardField('fitp_sport_year') && <label style={labelStyle}>Anno sportivo<input style={fieldStyle} type="number" value={item.sport_year || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'sport_year',e.target.value)}/></label>}
+                      {showStandardField('fitp_classification') && <label style={labelStyle}>Classificazione<input style={fieldStyle} value={item.classification || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'classification',e.target.value)}/></label>}
+                      {showStandardField('fitp_issue_date') && <label style={labelStyle}>Data emissione<input style={fieldStyle} type="date" value={item.issue_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'issue_date',e.target.value)}/></label>}
+                      {showStandardField('fitp_expiry_date') && <label style={labelStyle}>Scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'expiry_date',e.target.value)}/></label>}
+                      {showStandardField('fitp_status') && <label style={labelStyle}>Stato
                         {index === 0 && !fitpEditing ? (
                           <div style={{...fieldStyle,display:'flex',alignItems:'center',minHeight:42,background:'#f8faf7'}}>
-                            {item.status === 'active' && fitpDaysLeft !== null && fitpDaysLeft < 0
-                              ? 'Scaduta'
-                              : ({active:'Attiva',expired:'Scaduta',pending:'In attesa',cancelled:'Annullata'}[item.status] || item.status || 'Attiva')}
+                            {item.status === 'active' && fitpDaysLeft !== null && fitpDaysLeft < 0 ? 'Scaduta' : ({active:'Attiva',expired:'Scaduta',pending:'In attesa',cancelled:'Annullata'}[item.status] || item.status || 'Attiva')}
                           </div>
                         ) : (
                           <select style={fieldStyle} value={item.status || 'active'} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'status',e.target.value)}>
                             <option value="active">Attiva</option><option value="expired">Scaduta</option><option value="pending">In attesa</option><option value="cancelled">Annullata</option>
                           </select>
                         )}
-                      </label>
+                      </label>}
                     </div>
-                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>
+                    {showStandardField('fitp_notes') && <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} disabled={!!item.id && !(index === 0 && fitpEditing)} onChange={e=>updateFitpRecord(index,'notes',e.target.value)}/></label>}
                   </div>
                 ))}
-              </div>
+              </div>}
 
-              <div style={{display:'grid',gap:12}}>
+              {standardFieldVisibility.section_medical_enabled !== false && ['medical_regularity_status','medical_presented_date','medical_expiry_date','medical_verified_at'].some(showStandardField) && <div style={{display:'grid',gap:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
                   <div>
                     <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>CERTIFICATO MEDICO</h4>
                     <p className="muted" style={{margin:'4px 0 0',fontSize:11}}>Gestione riservata al super amministratore. Le registrazioni precedenti vengono conservate.</p>
                   </div>
                   {!currentMedical ? (
-                    <button type="button" className="password-button"
-                      onClick={addMedicalRecord}
-                      style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                      <Plus size={14}/>Inserisci certificato
-                    </button>
+                    <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Inserisci certificato</button>
                   ) : (
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                      <button type="button" className="password-button"
-                        onClick={() => setMedicalEditing(true)}
-                        style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                        Modifica
-                      </button>
-                      {medicalNeedsRenewal && (
-                        <button type="button" className="password-button"
-                          onClick={addMedicalRecord}
-                          style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                          <Plus size={14}/>Inserisci rinnovo
-                        </button>
-                      )}
+                      <button type="button" className="password-button" onClick={() => setMedicalEditing(true)} style={{display:'inline-flex',alignItems:'center',gap:6}}>Modifica</button>
+                      {medicalNeedsRenewal && <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Inserisci rinnovo</button>}
                     </div>
                   )}
                 </div>
@@ -1216,79 +1249,66 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                   <div key={item.id || `medical-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
                     <strong style={{fontSize:12,color:'#405b43'}}>{index === 0 ? 'Certificato corrente' : `Storico certificato ${index}`}{item.created_at ? ` · inserito il ${new Date(item.created_at).toLocaleDateString('it-IT')}` : ' · nuovo'}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
-                      <label style={labelStyle}>Stato di regolarità
+                      {showStandardField('medical_regularity_status') && <label style={labelStyle}>Stato di regolarità
                         {index === 0 && !medicalEditing ? (
                           <div style={{...fieldStyle,display:'flex',alignItems:'center',minHeight:42,background:'#f8faf7'}}>
-                            {['not_presented','not_required'].includes(item.regularity_status)
-                              ? (item.regularity_status === 'not_presented' ? 'Non presentato' : 'Non richiesto')
-                              : medicalDaysLeft !== null && medicalDaysLeft < 0
-                                ? 'Scaduto'
-                                : medicalDaysLeft !== null && medicalDaysLeft <= 30
-                                  ? 'In scadenza'
-                                  : ({regular:'Regolare',expiring:'In scadenza',expired:'Scaduto'}[item.regularity_status] || item.regularity_status || 'Non presentato')}
+                            {['not_presented','not_required'].includes(item.regularity_status) ? (item.regularity_status === 'not_presented' ? 'Non presentato' : 'Non richiesto') : medicalDaysLeft !== null && medicalDaysLeft < 0 ? 'Scaduto' : medicalDaysLeft !== null && medicalDaysLeft <= 30 ? 'In scadenza' : ({regular:'Regolare',expiring:'In scadenza',expired:'Scaduto'}[item.regularity_status] || item.regularity_status || 'Non presentato')}
                           </div>
                         ) : (
                           <select style={fieldStyle} value={item.regularity_status || 'not_presented'} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'regularity_status',e.target.value)}>
-                            <option value="regular">Regolare</option>
-                            <option value="expiring">In scadenza</option>
-                            <option value="expired">Scaduto</option>
-                            <option value="not_presented">Non presentato</option>
-                            <option value="not_required">Non richiesto</option>
+                            <option value="regular">Regolare</option><option value="expiring">In scadenza</option><option value="expired">Scaduto</option><option value="not_presented">Non presentato</option><option value="not_required">Non richiesto</option>
                           </select>
                         )}
-                      </label>
-                      <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>
+                      </label>}
+                      {showStandardField('medical_presented_date') && <label style={labelStyle}>Data presentazione<input style={fieldStyle} type="date" value={item.presented_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'presented_date',e.target.value)}/></label>}
+                      {showStandardField('medical_expiry_date') && <label style={labelStyle}>Data scadenza<input style={fieldStyle} type="date" value={item.expiry_date || ''} disabled={!!item.id && !(index === 0 && medicalEditing)} onChange={e=>updateMedicalRecord(index,'expiry_date',e.target.value)}/></label>}
                     </div>
-                    {item.verified_at && <small className="muted">Ultima verifica: {new Date(item.verified_at).toLocaleString('it-IT')}</small>}
+                    {showStandardField('medical_verified_at') && item.verified_at && <small className="muted">Ultima verifica: {new Date(item.verified_at).toLocaleString('it-IT')}</small>}
                   </div>
                 ))}
-              </div>
+              </div>}
 
-              <div style={{display:'grid',gap:12}}>
+              {standardFieldVisibility.section_sport_enabled !== false && ['sport_activity_type','sport_title','sport_season','sport_coach_name','sport_playing_level','sport_start_date','sport_end_date','sport_status','sport_competitive','sport_notes'].some(showStandardField) && <div style={{display:'grid',gap:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
                   <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>ATTIVITÀ SPORTIVE</h4>
-                  <button type="button" className="password-button" onClick={addSportRecord}
-                    style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <Plus size={14}/> Aggiungi attività
-                  </button>
+                  <button type="button" className="password-button" onClick={addSportRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/> Aggiungi attività</button>
                 </div>
                 {sportRecords.length === 0 && <p className="muted" style={{margin:0,fontSize:12}}>Nessuna attività registrata.</p>}
                 {sportRecords.map((item, index) => (
                   <div key={item.id || `sport-${index}`} style={{display:'grid',gap:10,padding:12,border:'1px solid #e2e9e1',borderRadius:12,background:'#fbfcfa'}}>
                     <strong style={{fontSize:12,color:'#405b43'}}>Attività {index + 1}</strong>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
-                      <label style={labelStyle}>Tipo attività
+                      {showStandardField('sport_activity_type') && <label style={labelStyle}>Tipo attività
                         <select style={fieldStyle} value={item.activity_type || 'course'} onChange={e=>updateSportRecord(index,'activity_type',e.target.value)}>
                           <option value="course">Corso</option><option value="lesson">Lezione</option><option value="team">Squadra</option><option value="tournament">Torneo</option><option value="competition">Competizione</option><option value="other">Altro</option>
                         </select>
-                      </label>
-                      <label style={labelStyle}>Nome attività<input style={fieldStyle} value={item.title || ''} onChange={e=>updateSportRecord(index,'title',e.target.value)} placeholder="Nome attività" /></label>
-                      <label style={labelStyle}>Stagione sportiva<input style={fieldStyle} value={item.season || ''} onChange={e=>updateSportRecord(index,'season',e.target.value)} placeholder="Es. 2026/2027"/></label>
-                      <label style={labelStyle}>Istruttore<input style={fieldStyle} value={item.coach_name || ''} onChange={e=>updateSportRecord(index,'coach_name',e.target.value)}/></label>
-                      <label style={labelStyle}>Livello di gioco<input style={fieldStyle} value={item.playing_level || ''} onChange={e=>updateSportRecord(index,'playing_level',e.target.value)}/></label>
-                      <label style={labelStyle}>Data inizio<input style={fieldStyle} type="date" value={item.start_date || ''} onChange={e=>updateSportRecord(index,'start_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Data fine<input style={fieldStyle} type="date" value={item.end_date || ''} onChange={e=>updateSportRecord(index,'end_date',e.target.value)}/></label>
-                      <label style={labelStyle}>Stato
+                      </label>}
+                      {showStandardField('sport_title') && <label style={labelStyle}>Nome attività<input style={fieldStyle} value={item.title || ''} onChange={e=>updateSportRecord(index,'title',e.target.value)} placeholder="Nome attività"/></label>}
+                      {showStandardField('sport_season') && <label style={labelStyle}>Stagione sportiva<input style={fieldStyle} value={item.season || ''} onChange={e=>updateSportRecord(index,'season',e.target.value)} placeholder="Es. 2026/2027"/></label>}
+                      {showStandardField('sport_coach_name') && <label style={labelStyle}>Istruttore<input style={fieldStyle} value={item.coach_name || ''} onChange={e=>updateSportRecord(index,'coach_name',e.target.value)}/></label>}
+                      {showStandardField('sport_playing_level') && <label style={labelStyle}>Livello di gioco<input style={fieldStyle} value={item.playing_level || ''} onChange={e=>updateSportRecord(index,'playing_level',e.target.value)}/></label>}
+                      {showStandardField('sport_start_date') && <label style={labelStyle}>Data inizio<input style={fieldStyle} type="date" value={item.start_date || ''} onChange={e=>updateSportRecord(index,'start_date',e.target.value)}/></label>}
+                      {showStandardField('sport_end_date') && <label style={labelStyle}>Data fine<input style={fieldStyle} type="date" value={item.end_date || ''} onChange={e=>updateSportRecord(index,'end_date',e.target.value)}/></label>}
+                      {showStandardField('sport_status') && <label style={labelStyle}>Stato
                         <select style={fieldStyle} value={item.status || 'active'} onChange={e=>updateSportRecord(index,'status',e.target.value)}>
                           <option value="active">Attiva</option><option value="completed">Completata</option><option value="cancelled">Annullata</option>
                         </select>
-                      </label>
-                      <label style={{...labelStyle,display:'flex',alignItems:'center',gap:8,alignSelf:'end',padding:'10px 0'}}>
+                      </label>}
+                      {showStandardField('sport_competitive') && <label style={{...labelStyle,display:'flex',alignItems:'center',gap:8,alignSelf:'end',padding:'10px 0'}}>
                         <input type="checkbox" checked={!!item.competitive} onChange={e=>updateSportRecord(index,'competitive',e.target.checked)} style={{accentColor:'#557b42',width:16,height:16}}/>
                         Attività agonistica
-                      </label>
+                      </label>}
                     </div>
-                    <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateSportRecord(index,'notes',e.target.value)}/></label>
+                    {showStandardField('sport_notes') && <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateSportRecord(index,'notes',e.target.value)}/></label>}
                   </div>
                 ))}
-              </div>
+              </div>}
 
-              <label style={labelStyle}>
+              {showStandardField('internal_notes') && <label style={labelStyle}>
                 Note interne
                 <textarea name="internal_notes" rows={4} value={form.internal_notes}
                   onChange={changeField} style={{...fieldStyle,resize:'vertical'}}/>
-              </label>
+              </label>}
 
               <div style={{display:'flex',gap:9,flexWrap:'wrap',justifyContent:'flex-end',borderTop:'1px solid #edf0ec',paddingTop:14}}>
                 <button type="button" className="password-button" onClick={cancelEdit}>Annulla</button>
