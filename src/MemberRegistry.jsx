@@ -1015,7 +1015,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
           <h2 style={{marginBottom:5}}>Anagrafica soci</h2>
           <p className="muted" style={{margin:0}}>Archivio anagrafico del circolo e dati associativi.</p>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginLeft:'auto'}}>
           <button type="button" className="password-button" onClick={openConfiguration}
             style={{display:'inline-flex',alignItems:'center',gap:7}}>
             <Settings size={16}/> Configurazione
@@ -1238,7 +1238,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                   {!currentMedical ? (
                     <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Inserisci certificato</button>
                   ) : (
-                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginLeft:'auto'}}>
                       <button type="button" className="password-button" onClick={() => setMedicalEditing(true)} style={{display:'inline-flex',alignItems:'center',gap:6}}>Modifica</button>
                       {medicalNeedsRenewal && <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Inserisci rinnovo</button>}
                     </div>
