@@ -147,6 +147,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [configurationNotice, setConfigurationNotice] = useState('');
 
   const authorized = profile?.role === 'super_admin' && profile?.status === 'active';
+  const showStandardField = key => standardFieldVisibility[key] !== false;
 
   async function openConfiguration() {
     if (!authorized) return;
@@ -314,6 +315,21 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 
   useEffect(() => {
     loadRegistry(false);
+    if (authorized) {
+      supabase.from('member_registry_settings')
+        .select('setting_value')
+        .eq('setting_key', 'standard_fields_visibility')
+        .maybeSingle()
+        .then(({ data, error: settingsError }) => {
+          if (!settingsError) {
+            const savedVisibility = data?.setting_value;
+            setStandardFieldVisibility({
+              ...DEFAULT_STANDARD_FIELD_VISIBILITY,
+              ...(savedVisibility && typeof savedVisibility === 'object' ? savedVisibility : {})
+            });
+          }
+        });
+    }
     // Il caricamento dipende dall'autorizzazione del profilo corrente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authorized]);
@@ -869,7 +885,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
         </div>
 
         <div style={{padding:14,border:'1px solid #dce8d8',borderRadius:12,background:'#f7faf5',color:'#405b43',fontSize:13,lineHeight:1.5}}>
-Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. Nascondere un campo non elimina né modifica il valore già registrato nel database. In questa fase la configurazione viene salvata, ma non cambia ancora la visualizzazione della scheda socio.
+Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. Nascondere un campo non elimina né modifica il valore già registrato nel database. Le modifiche si applicano alla scheda anagrafica. I campi nascosti conservano tutti i valori già registrati.
         </div>
 
         {configurationError && <div role="alert" style={{padding:12,borderRadius:10,background:'#fff1ef',color:'#963c32'}}>{configurationError}</div>}
@@ -879,7 +895,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
         <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:14}}>
           <div>
             <h3 style={{margin:0,fontSize:16}}>Campi standard dell'anagrafica</h3>
-            <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Attiva o disattiva la futura visualizzazione dei singoli campi. Le modifiche non cancellano i dati.</p>
+            <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Attiva o disattiva la visualizzazione dei singoli campi. Le modifiche non cancellano i dati.</p>
           </div>
           {STANDARD_REGISTRY_FIELDS.map(group => (
             <div key={group.section} style={{display:'grid',gap:8}}>
@@ -1059,86 +1075,69 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                 </button>
               </div>
 
-              <div>
-                <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>DATI PERSONALI</h4>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
-                  <Field label="Nome *" name="first_name" value={form.first_name} onChange={changeField} required/>
-                  <Field label="Cognome *" name="last_name" value={form.last_name} onChange={changeField} required/>
-                  <Field label="Data di nascita" name="birth_date" type="date" value={form.birth_date} onChange={changeField}/>
-                  <Field label="Luogo di nascita" name="birth_place" value={form.birth_place} onChange={changeField}/>
-                  <Field label="Codice fiscale" name="tax_code" value={form.tax_code} onChange={changeField} maxLength={32}/>
-                  <Field label="Email di contatto" name="contact_email" type="email" value={contactEmail} onChange={event => setContactEmail(event.target.value)} placeholder="email personale" />
-                  <Field label="Telefono" name="contact_phone" type="tel" value={contactPhone} onChange={event => setContactPhone(event.target.value)} placeholder="numero di telefono" />
-                  <Field label="Cittadinanza" name="citizenship" value={form.citizenship} onChange={changeField}/>
-                  <SelectField label="Genere" name="gender" value={form.gender} onChange={changeField}>
-                    <option value="">Non specificato</option>
-                    <option value="M">Maschile</option>
-                    <option value="F">Femminile</option>
-                    <option value="other">Altro</option>
-                  </SelectField>
-                </div>
-              </div>
-
-              <div>
-                <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>RESIDENZA</h4>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
-                  <Field label="Indirizzo" name="residence_address" value={form.residence_address} onChange={changeField}/>
-                  <Field label="CAP" name="residence_postal_code" value={form.residence_postal_code} onChange={changeField}/>
-                  <Field label="Comune" name="residence_city" value={form.residence_city} onChange={changeField}/>
-                  <Field label="Provincia" name="residence_province" value={form.residence_province} onChange={changeField} maxLength={2}/>
-                </div>
-              </div>
-
-              <div>
-                <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>DOMICILIO (SE DIVERSO)</h4>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
-                  <Field label="Indirizzo" name="domicile_address" value={form.domicile_address} onChange={changeField}/>
-                  <Field label="CAP" name="domicile_postal_code" value={form.domicile_postal_code} onChange={changeField}/>
-                  <Field label="Comune" name="domicile_city" value={form.domicile_city} onChange={changeField}/>
-                  <Field label="Provincia" name="domicile_province" value={form.domicile_province} onChange={changeField} maxLength={2}/>
-                </div>
-              </div>
-
-              <div>
-                <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>DATI ASSOCIATIVI</h4>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
-                  <Field label="Data iscrizione" name="enrollment_date" type="date" value={form.enrollment_date} onChange={changeField}/>
-                  <Field label="Fine iscrizione" name="membership_end_date" type="date" value={form.membership_end_date} onChange={changeField}/>
-                  <SelectField label="Stato socio" name="membership_status" value={form.membership_status} onChange={changeField}>
-                    <option value="active">Attivo</option>
-                    <option value="suspended">Sospeso</option>
-                    <option value="ceased">Cessato</option>
-                    <option value="archived">Archiviato</option>
-                  </SelectField>
-                  <div style={{gridColumn:'1 / -1',display:'grid',gap:8}}>
-                    <span style={labelStyle}>Categorie associative (selezionabili più categorie)</span>
-                    <div style={{
-                      display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',
-                      gap:8,padding:12,border:'1px solid #dce4dc',borderRadius:10,background:'#fbfcfa'
-                    }}>
-                      {categories.filter(item => item.active).map(item => (
-                        <label key={item.id} style={{
-                          display:'flex',alignItems:'center',gap:9,padding:'8px 9px',
-                          borderRadius:8,background:selectedCategoryIds.includes(item.id)?'#edf5e9':'#fff',
-                          border:'1px solid '+(selectedCategoryIds.includes(item.id)?'#a9c49f':'#e4eae2'),
-                          color:'#304338',fontSize:13,fontWeight:600,cursor:'pointer'
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedCategoryIds.includes(item.id)}
-                            onChange={() => toggleCategory(item.id)}
-                            style={{accentColor:'#557b42',width:16,height:16}}
-                          />
-                          {item.name}
-                        </label>
-                      ))}
-                      {categories.filter(item => item.active).length === 0 && (
-                        <span className="muted">Nessuna categoria attiva disponibile.</span>
-                      )}
+              {[
+                {
+                  title: 'DATI PERSONALI',
+                  keys: ['first_name','last_name','birth_date','birth_place','tax_code','contact_email','contact_phone','citizenship','gender']
+                },
+                { title: 'RESIDENZA', keys: ['residence_address','residence_postal_code','residence_city','residence_province'] },
+                { title: 'DOMICILIO (SE DIVERSO)', keys: ['domicile_address','domicile_postal_code','domicile_city','domicile_province'] },
+                { title: 'DATI ASSOCIATIVI', keys: ['enrollment_date','membership_end_date','membership_status','category_id'] }
+              ].map(section => {
+                const visibleKeys = section.keys.filter(showStandardField);
+                if (visibleKeys.length === 0) return null;
+                return (
+                  <div key={section.title}>
+                    <h4 style={{margin:'0 0 10px',fontSize:13,color:'#557b42'}}>{section.title}</h4>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:11}}>
+                      {section.title === 'DATI PERSONALI' && <>
+                        {showStandardField('first_name') && <Field label="Nome *" name="first_name" value={form.first_name} onChange={changeField} required/>}
+                        {showStandardField('last_name') && <Field label="Cognome *" name="last_name" value={form.last_name} onChange={changeField} required/>}
+                        {showStandardField('birth_date') && <Field label="Data di nascita" name="birth_date" type="date" value={form.birth_date} onChange={changeField}/>}
+                        {showStandardField('birth_place') && <Field label="Luogo di nascita" name="birth_place" value={form.birth_place} onChange={changeField}/>}
+                        {showStandardField('tax_code') && <Field label="Codice fiscale" name="tax_code" value={form.tax_code} onChange={changeField} maxLength={32}/>}
+                        {showStandardField('contact_email') && <Field label="Email di contatto" name="contact_email" type="email" value={contactEmail} onChange={event => setContactEmail(event.target.value)} placeholder="email personale" />}
+                        {showStandardField('contact_phone') && <Field label="Telefono" name="contact_phone" type="tel" value={contactPhone} onChange={event => setContactPhone(event.target.value)} placeholder="numero di telefono" />}
+                        {showStandardField('citizenship') && <Field label="Cittadinanza" name="citizenship" value={form.citizenship} onChange={changeField}/>}
+                        {showStandardField('gender') && <SelectField label="Genere" name="gender" value={form.gender} onChange={changeField}>
+                          <option value="">Non specificato</option><option value="M">Maschile</option><option value="F">Femminile</option><option value="other">Altro</option>
+                        </SelectField>}
+                      </>}
+                      {section.title === 'RESIDENZA' && <>
+                        {showStandardField('residence_address') && <Field label="Indirizzo" name="residence_address" value={form.residence_address} onChange={changeField}/>}
+                        {showStandardField('residence_postal_code') && <Field label="CAP" name="residence_postal_code" value={form.residence_postal_code} onChange={changeField}/>}
+                        {showStandardField('residence_city') && <Field label="Comune" name="residence_city" value={form.residence_city} onChange={changeField}/>}
+                        {showStandardField('residence_province') && <Field label="Provincia" name="residence_province" value={form.residence_province} onChange={changeField} maxLength={2}/>}
+                      </>}
+                      {section.title === 'DOMICILIO (SE DIVERSO)' && <>
+                        {showStandardField('domicile_address') && <Field label="Indirizzo" name="domicile_address" value={form.domicile_address} onChange={changeField}/>}
+                        {showStandardField('domicile_postal_code') && <Field label="CAP" name="domicile_postal_code" value={form.domicile_postal_code} onChange={changeField}/>}
+                        {showStandardField('domicile_city') && <Field label="Comune" name="domicile_city" value={form.domicile_city} onChange={changeField}/>}
+                        {showStandardField('domicile_province') && <Field label="Provincia" name="domicile_province" value={form.domicile_province} onChange={changeField} maxLength={2}/>}
+                      </>}
+                      {section.title === 'DATI ASSOCIATIVI' && <>
+                        {showStandardField('enrollment_date') && <Field label="Data iscrizione" name="enrollment_date" type="date" value={form.enrollment_date} onChange={changeField}/>}
+                        {showStandardField('membership_end_date') && <Field label="Fine iscrizione" name="membership_end_date" type="date" value={form.membership_end_date} onChange={changeField}/>}
+                        {showStandardField('membership_status') && <SelectField label="Stato socio" name="membership_status" value={form.membership_status} onChange={changeField}>
+                          <option value="active">Attivo</option><option value="suspended">Sospeso</option><option value="ceased">Cessato</option><option value="archived">Archiviato</option>
+                        </SelectField>}
+                        {showStandardField('category_id') && <div style={{gridColumn:'1 / -1',display:'grid',gap:8}}>
+                          <span style={labelStyle}>Categorie associative (selezionabili più categorie)</span>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:8,padding:12,border:'1px solid #dce4dc',borderRadius:10,background:'#fbfcfa'}}>
+                            {categories.filter(item => item.active).map(item => (
+                              <label key={item.id} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 9px',borderRadius:8,background:selectedCategoryIds.includes(item.id)?'#edf5e9':'#fff',border:'1px solid '+(selectedCategoryIds.includes(item.id)?'#a9c49f':'#e4eae2'),color:'#304338',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                                <input type="checkbox" checked={selectedCategoryIds.includes(item.id)} onChange={() => toggleCategory(item.id)} style={{accentColor:'#557b42',width:16,height:16}}/>
+                                {item.name}
+                              </label>
+                            ))}
+                            {categories.filter(item => item.active).length === 0 && <span className="muted">Nessuna categoria attiva disponibile.</span>}
+                          </div>
+                        </div>}
+                      </>}
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
 
               <div style={{display:'grid',gap:12}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
