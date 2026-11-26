@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search, Users, UserRound, Plus, Save, X, RefreshCw,
-  ChevronRight, CalendarDays, ShieldCheck
+  ChevronRight, CalendarDays, ShieldCheck, Settings, ArrowLeft
 } from 'lucide-react';
 import { supabase } from './supabase';
 
@@ -112,8 +112,35 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [configurationOpen, setConfigurationOpen] = useState(false);
+  const [configurationFields, setConfigurationFields] = useState([]);
+  const [configurationLoading, setConfigurationLoading] = useState(false);
+  const [configurationError, setConfigurationError] = useState('');
 
   const authorized = profile?.role === 'super_admin' && profile?.status === 'active';
+
+  async function openConfiguration() {
+    if (!authorized) return;
+    setConfigurationOpen(true);
+    setConfigurationLoading(true);
+    setConfigurationError('');
+
+    // In questa prima fase leggiamo soltanto le definizioni già presenti.
+    // Nessun campo della scheda socio e nessun dato anagrafico viene modificato.
+    const result = await supabase
+      .from('member_custom_fields')
+      .select('id,field_key,label,description,section,data_type,options,active,visible,required,show_in_summary,sort_order')
+      .order('sort_order', { ascending: true })
+      .order('label', { ascending: true });
+
+    if (result.error) {
+      setConfigurationFields([]);
+      setConfigurationError('Impossibile leggere la configurazione dei campi: ' + result.error.message);
+    } else {
+      setConfigurationFields(result.data || []);
+    }
+    setConfigurationLoading(false);
+  }
 
   async function loadRegistry(keepSelection = true) {
     if (!authorized) {
@@ -765,6 +792,63 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   );
   const linkedProfile = profileById.get(form.profile_id);
 
+  if (configurationOpen) {
+    return (
+      <section className="admin-panel" style={{display:'grid',gap:18}}>
+        <div className="admin-heading" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div>
+            <span className="eyebrow">GESTIONE RISERVATA · TENNIS CLUB PABILLONIS</span>
+            <h2 style={{marginBottom:5}}>Configurazione anagrafica</h2>
+            <p className="muted" style={{margin:0}}>Prima fase: consultazione delle definizioni dei campi personalizzati già presenti.</p>
+          </div>
+          <button type="button" className="password-button" onClick={()=>setConfigurationOpen(false)}
+            style={{display:'inline-flex',alignItems:'center',gap:7}}>
+            <ArrowLeft size={16}/> Torna all'anagrafica
+          </button>
+        </div>
+
+        <div style={{padding:14,border:'1px solid #dce8d8',borderRadius:12,background:'#f7faf5',color:'#405b43',fontSize:13,lineHeight:1.5}}>
+          In questo passaggio non vengono modificati campi, schede o dati esistenti. Stiamo verificando la lettura delle impostazioni prima di introdurre i comandi di configurazione.
+        </div>
+
+        {configurationError && <div role="alert" style={{padding:12,borderRadius:10,background:'#fff1ef',color:'#963c32'}}>{configurationError}</div>}
+
+        <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:12}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+            <div>
+              <h3 style={{margin:0,fontSize:16}}>Campi personalizzati esistenti</h3>
+              <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Definizioni presenti in member_custom_fields</p>
+            </div>
+            <button type="button" className="password-button" onClick={openConfiguration} disabled={configurationLoading}
+              style={{display:'inline-flex',alignItems:'center',gap:7}}>
+              <RefreshCw size={15}/> Aggiorna
+            </button>
+          </div>
+
+          {configurationLoading ? <p className="muted">Lettura configurazione…</p>
+            : configurationFields.length === 0
+              ? <p className="muted" style={{margin:0}}>Nessun campo personalizzato presente. I campi standard saranno gestiti nel passaggio successivo.</p>
+              : <div style={{display:'grid',gap:8}}>
+                  {configurationFields.map(item => (
+                    <div key={item.id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:12,border:'1px solid #e7ece5',borderRadius:11,background:'#fbfcfa'}}>
+                      <div style={{minWidth:0}}>
+                        <strong style={{display:'block',color:'#304338',fontSize:13}}>{item.label}</strong>
+                        <small className="muted">{item.field_key} · {item.data_type} · sezione: {item.section || 'custom'}</small>
+                        {item.description && <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>{item.description}</p>}
+                      </div>
+                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.active?'#e8f4e5':'#f1f2f1',color:item.active?'#3f6c37':'#69736b'}}>{item.active?'Attivo':'Disattivo'}</span>
+                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.visible?'#e8f0fa':'#f1f2f1',color:item.visible?'#3f5f83':'#69736b'}}>{item.visible?'Visibile':'Nascosto'}</span>
+                        {item.required && <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:'#fff3df',color:'#8a5b16'}}>Obbligatorio</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="admin-panel" style={{display:'grid',gap:18}}>
       <div className="admin-heading">
@@ -773,7 +857,13 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
           <h2 style={{marginBottom:5}}>Anagrafica soci</h2>
           <p className="muted" style={{margin:0}}>Archivio anagrafico del circolo e dati associativi.</p>
         </div>
-        <Users size={29}/>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button type="button" className="password-button" onClick={openConfiguration}
+            style={{display:'inline-flex',alignItems:'center',gap:7}}>
+            <Settings size={16}/> Configurazione
+          </button>
+          <Users size={29}/>
+        </div>
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))',gap:10}}>
