@@ -5,6 +5,32 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabase';
 
+
+const STANDARD_REGISTRY_FIELDS = [
+  { section: 'Dati personali', fields: [
+    ['first_name', 'Nome'], ['last_name', 'Cognome'], ['birth_date', 'Data di nascita'],
+    ['birth_place', 'Luogo di nascita'], ['tax_code', 'Codice fiscale'],
+    ['contact_email', 'Email di contatto'], ['contact_phone', 'Telefono'],
+    ['citizenship', 'Cittadinanza'], ['gender', 'Genere']
+  ]},
+  { section: 'Residenza', fields: [
+    ['residence_address', 'Indirizzo'], ['residence_postal_code', 'CAP'],
+    ['residence_city', 'Comune'], ['residence_province', 'Provincia']
+  ]},
+  { section: 'Domicilio', fields: [
+    ['domicile_address', 'Indirizzo'], ['domicile_postal_code', 'CAP'],
+    ['domicile_city', 'Comune'], ['domicile_province', 'Provincia']
+  ]},
+  { section: 'Dati associativi', fields: [
+    ['enrollment_date', 'Data iscrizione'], ['membership_end_date', 'Fine iscrizione'],
+    ['membership_status', 'Stato socio'], ['category_id', 'Categorie associative']
+  ]}
+];
+
+const DEFAULT_STANDARD_FIELD_VISIBILITY = Object.fromEntries(
+  STANDARD_REGISTRY_FIELDS.flatMap(group => group.fields.map(([key]) => [key, true]))
+);
+
 const emptyMember = {
   profile_id: '',
   full_name: '',
@@ -116,6 +142,9 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [configurationFields, setConfigurationFields] = useState([]);
   const [configurationLoading, setConfigurationLoading] = useState(false);
   const [configurationError, setConfigurationError] = useState('');
+  const [standardFieldVisibility, setStandardFieldVisibility] = useState(DEFAULT_STANDARD_FIELD_VISIBILITY);
+  const [configurationSaving, setConfigurationSaving] = useState(false);
+  const [configurationNotice, setConfigurationNotice] = useState('');
 
   const authorized = profile?.role === 'super_admin' && profile?.status === 'active';
 
@@ -127,19 +156,51 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 
     // In questa prima fase leggiamo soltanto le definizioni già presenti.
     // Nessun campo della scheda socio e nessun dato anagrafico viene modificato.
-    const result = await supabase
-      .from('member_custom_fields')
-      .select('id,field_key,label,description,section,data_type,options,active,visible,required,show_in_summary,sort_order')
-      .order('sort_order', { ascending: true })
-      .order('label', { ascending: true });
+    const [fieldsResult, settingsResult] = await Promise.all([
+      supabase
+        .from('member_custom_fields')
+        .select('id,field_key,label,description,section,data_type,options,active,visible,required,show_in_summary,sort_order')
+        .order('sort_order', { ascending: true })
+        .order('label', { ascending: true }),
+      supabase.from('member_registry_settings')
+        .select('setting_value')
+        .eq('setting_key', 'standard_fields_visibility')
+        .maybeSingle()
+    ]);
 
-    if (result.error) {
+    if (fieldsResult.error) {
       setConfigurationFields([]);
-      setConfigurationError('Impossibile leggere la configurazione dei campi: ' + result.error.message);
+      setConfigurationError('Impossibile leggere la configurazione dei campi personalizzati: ' + fieldsResult.error.message);
     } else {
-      setConfigurationFields(result.data || []);
+      setConfigurationFields(fieldsResult.data || []);
+    }
+    if (settingsResult.error) {
+      setConfigurationError(current => current || ('Impossibile leggere le impostazioni dei campi standard: ' + settingsResult.error.message));
+    } else {
+      const savedVisibility = settingsResult.data?.setting_value;
+      setStandardFieldVisibility({ ...DEFAULT_STANDARD_FIELD_VISIBILITY, ...(savedVisibility && typeof savedVisibility === 'object' ? savedVisibility : {}) });
     }
     setConfigurationLoading(false);
+  }
+
+  async function saveStandardFieldVisibility() {
+    if (!authorized || configurationSaving) return;
+    setConfigurationSaving(true);
+    setConfigurationError('');
+    setConfigurationNotice('');
+    const result = await supabase.from('member_registry_settings').upsert({
+      setting_key: 'standard_fields_visibility',
+      setting_value: standardFieldVisibility,
+      description: 'Visibilità dei campi standard nella configurazione Anagrafica Soci',
+      updated_by: profile?.id || null,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'setting_key' });
+    if (result.error) {
+      setConfigurationError('Impossibile salvare le impostazioni: ' + result.error.message);
+    } else {
+      setConfigurationNotice('Impostazioni di visibilità salvate. Nessun dato anagrafico è stato cancellato o modificato.');
+    }
+    setConfigurationSaving(false);
   }
 
   async function loadRegistry(keepSelection = true) {
@@ -799,7 +860,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
           <div>
             <span className="eyebrow">GESTIONE RISERVATA · TENNIS CLUB PABILLONIS</span>
             <h2 style={{marginBottom:5}}>Configurazione anagrafica</h2>
-            <p className="muted" style={{margin:0}}>Prima fase: consultazione delle definizioni dei campi personalizzati già presenti.</p>
+            <p className="muted" style={{margin:0}}>Gestisci la visibilità dei campi standard e consulta i campi personalizzati.</p>
           </div>
           <button type="button" className="password-button" onClick={()=>setConfigurationOpen(false)}
             style={{display:'inline-flex',alignItems:'center',gap:7}}>
@@ -808,10 +869,41 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
         </div>
 
         <div style={{padding:14,border:'1px solid #dce8d8',borderRadius:12,background:'#f7faf5',color:'#405b43',fontSize:13,lineHeight:1.5}}>
-          In questo passaggio non vengono modificati campi, schede o dati esistenti. Stiamo verificando la lettura delle impostazioni prima di introdurre i comandi di configurazione.
+Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. Nascondere un campo non elimina né modifica il valore già registrato nel database. In questa fase la configurazione viene salvata, ma non cambia ancora la visualizzazione della scheda socio.
         </div>
 
         {configurationError && <div role="alert" style={{padding:12,borderRadius:10,background:'#fff1ef',color:'#963c32'}}>{configurationError}</div>}
+
+        {configurationNotice && <div role="status" style={{padding:12,borderRadius:10,background:'#edf7e9',color:'#3f6c37',fontSize:13}}>{configurationNotice}</div>}
+
+        <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:14}}>
+          <div>
+            <h3 style={{margin:0,fontSize:16}}>Campi standard dell'anagrafica</h3>
+            <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Attiva o disattiva la futura visualizzazione dei singoli campi. Le modifiche non cancellano i dati.</p>
+          </div>
+          {STANDARD_REGISTRY_FIELDS.map(group => (
+            <div key={group.section} style={{display:'grid',gap:8}}>
+              <h4 style={{margin:0,fontSize:12,letterSpacing:'.06em',color:'#557b42'}}>{group.section.toUpperCase()}</h4>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8}}>
+                {group.fields.map(([key, label]) => (
+                  <label key={key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 12px',border:'1px solid #e7ece5',borderRadius:10,background:'#fbfcfa',color:'#304338',fontSize:13}}>
+                    <span>{label}</span>
+                    <input type="checkbox" checked={standardFieldVisibility[key] !== false} onChange={event => {
+                      setStandardFieldVisibility(current => ({...current, [key]: event.target.checked}));
+                      setConfigurationNotice('');
+                    }} style={{width:17,height:17,accentColor:'#557b42'}} />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'flex-end'}}>
+            <button type="button" className="password-button" onClick={saveStandardFieldVisibility} disabled={configurationSaving || configurationLoading}
+              style={{display:'inline-flex',alignItems:'center',gap:7}}>
+              <Save size={15}/>{configurationSaving ? 'Salvataggio…' : 'Salva configurazione'}
+            </button>
+          </div>
+        </div>
 
         <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:12}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
