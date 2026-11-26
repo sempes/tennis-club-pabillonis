@@ -49,6 +49,13 @@ const STANDARD_REGISTRY_FIELDS = [
   ]}
 ];
 
+const CUSTOM_FIELD_TYPES = [
+  ['text','Testo breve'], ['long_text','Testo lungo'], ['number','Numero intero'],
+  ['decimal','Numero decimale'], ['currency','Valuta'], ['date','Data'],
+  ['boolean','Sì / No'], ['email','Email'], ['phone','Telefono'], ['url','URL'],
+  ['single_select','Selezione singola'], ['multi_select','Selezione multipla']
+];
+
 const SECTION_VISIBILITY_KEYS = {
   'Tesseramento FITP': 'section_fitp_enabled',
   'Certificato medico': 'section_medical_enabled',
@@ -178,9 +185,85 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   const [standardFieldVisibility, setStandardFieldVisibility] = useState(DEFAULT_STANDARD_FIELD_VISIBILITY);
   const [configurationSaving, setConfigurationSaving] = useState(false);
   const [configurationNotice, setConfigurationNotice] = useState('');
+  const [customValues, setCustomValues] = useState({});
+  const [customFieldDraft, setCustomFieldDraft] = useState(null);
+  const [customFieldSaving, setCustomFieldSaving] = useState(false);
 
   const authorized = profile?.role === 'super_admin' && profile?.status === 'active';
   const showStandardField = key => standardFieldVisibility[key] !== false;
+
+  function updateCustomValue(fieldId, value) {
+    setCustomValues(current => ({ ...current, [fieldId]: value }));
+  }
+
+  function newCustomField() {
+    setCustomFieldDraft({ id: null, label: '', description: '', section: 'Documenti', data_type: 'text', optionsText: '', sort_order: (configurationFields.length + 1) * 10, required: false, visible: true, show_in_summary: false, active: true });
+    setConfigurationError('');
+    setConfigurationNotice('');
+  }
+
+  function editCustomField(item) {
+    setCustomFieldDraft({ ...item, optionsText: Array.isArray(item.options) ? item.options.join('\n') : '', originalType: item.data_type });
+    setConfigurationError('');
+    setConfigurationNotice('');
+  }
+
+  async function saveCustomField() {
+    if (!authorized || customFieldSaving || !customFieldDraft) return;
+    const label = (customFieldDraft.label || '').trim();
+    const section = (customFieldDraft.section || '').trim();
+    if (!label || !section) {
+      setConfigurationError('Inserisci il nome del campo e la sezione.');
+      return;
+    }
+    const options = ['single_select','multi_select'].includes(customFieldDraft.data_type)
+      ? [...new Set((customFieldDraft.optionsText || '').split(/[\n,;]/).map(v => v.trim()).filter(Boolean))]
+      : [];
+    if (['single_select','multi_select'].includes(customFieldDraft.data_type) && !options.length) {
+      setConfigurationError('Inserisci almeno un’opzione per questo tipo di campo.');
+      return;
+    }
+    setCustomFieldSaving(true);
+    setConfigurationError('');
+    const payload = {
+      label, description: (customFieldDraft.description || '').trim() || null,
+      section, data_type: customFieldDraft.data_type, options,
+      sort_order: Number(customFieldDraft.sort_order) || 0,
+      required: !!customFieldDraft.required, visible: !!customFieldDraft.visible,
+      show_in_summary: !!customFieldDraft.show_in_summary,
+      active: customFieldDraft.active !== false, updated_at: new Date().toISOString()
+    };
+    let result;
+    if (customFieldDraft.id) {
+      // Il tipo resta invariato in modifica per proteggere i valori già registrati.
+      result = await supabase.from('member_custom_fields').update(payload).eq('id', customFieldDraft.id);
+    } else {
+      const slug = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'campo';
+      result = await supabase.from('member_custom_fields').insert({
+        ...payload, field_key: `${slug}_${Date.now().toString(36)}`, created_at: new Date().toISOString()
+      });
+    }
+    if (result.error) {
+      setConfigurationError('Impossibile salvare il campo: ' + result.error.message);
+    } else {
+      setCustomFieldDraft(null);
+      setConfigurationNotice('Campo personalizzato salvato.');
+      await openConfiguration();
+    }
+    setCustomFieldSaving(false);
+  }
+
+  async function setCustomFieldActive(item, active) {
+    if (!authorized) return;
+    setConfigurationError('');
+    const result = await supabase.from('member_custom_fields')
+      .update({ active, updated_at: new Date().toISOString() }).eq('id', item.id);
+    if (result.error) setConfigurationError('Impossibile aggiornare il campo: ' + result.error.message);
+    else {
+      setConfigurationNotice(active ? 'Campo riattivato.' : 'Campo archiviato. I valori esistenti sono conservati.');
+      await openConfiguration();
+    }
+  }
 
   async function openConfiguration() {
     if (!authorized) return;
@@ -188,8 +271,6 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setConfigurationLoading(true);
     setConfigurationError('');
 
-    // In questa prima fase leggiamo soltanto le definizioni già presenti.
-    // Nessun campo della scheda socio e nessun dato anagrafico viene modificato.
     const [fieldsResult, settingsResult] = await Promise.all([
       supabase
         .from('member_custom_fields')
@@ -349,6 +430,12 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   useEffect(() => {
     loadRegistry(false);
     if (authorized) {
+      supabase.from('member_custom_fields')
+        .select('id,field_key,label,description,section,data_type,options,active,visible,required,show_in_summary,sort_order')
+        .order('sort_order', { ascending: true }).order('label', { ascending: true })
+        .then(({ data, error: fieldsError }) => {
+          if (!fieldsError) setConfigurationFields(data || []);
+        });
       supabase.from('member_registry_settings')
         .select('setting_value')
         .eq('setting_key', 'standard_fields_visibility')
@@ -397,6 +484,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setFitpRecords([]);
     setSportRecords([]);
     setMedicalRecords([]);
+    setCustomValues({});
     setFitpEditing(false);
     setMedicalEditing(false);
   }
@@ -412,6 +500,14 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setMedicalEditing(false);
     setContactEmail('');
     setContactPhone('');
+    setCustomValues({});
+    const customResult = await supabase.from('member_custom_values')
+      .select('field_id,value').eq('member_id', record.id);
+    if (customResult.error) {
+      setError('Impossibile caricare i campi personalizzati: ' + customResult.error.message);
+    } else {
+      setCustomValues(Object.fromEntries((customResult.data || []).map(item => [item.field_id, item.value])));
+    }
     const emailResult = await supabase
       .from('member_contacts')
       .select('value')
@@ -498,6 +594,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setFitpRecords([]);
     setSportRecords([]);
     setMedicalRecords([]);
+    setCustomValues({});
     setFitpEditing(false);
     setMedicalEditing(false);
     setNotice('');
@@ -553,6 +650,16 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       return;
     }
 
+    const requiredCustomFields = configurationFields.filter(field => field.active && field.visible && field.required);
+    const missingCustomField = requiredCustomFields.find(field => {
+      const value = customValues[field.id];
+      return value == null || value === '' || (Array.isArray(value) && value.length === 0) || (field.data_type === 'boolean' && value !== true);
+    });
+    if (missingCustomField) {
+      setError(`Il campo \"${missingCustomField.label}\" è obbligatorio.`);
+      return;
+    }
+
     const payload = {
       profile_id: form.profile_id || null,
       full_name: fullName,
@@ -598,6 +705,24 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     }
 
     const memberId = result.data.id;
+
+    // Salva soltanto i campi attivi e visibili: campi nascosti o archiviati
+    // e i relativi valori non vengono mai toccati.
+    const editableCustomFields = configurationFields.filter(field => field.active && field.visible);
+    if (editableCustomFields.length) {
+      const customRows = editableCustomFields.map(field => ({
+        member_id: memberId, field_id: field.id,
+        value: customValues[field.id] === undefined || customValues[field.id] === '' ? null : customValues[field.id],
+        updated_by: profile.id, updated_at: new Date().toISOString()
+      }));
+      const customSave = await supabase.from('member_custom_values').upsert(customRows, { onConflict: 'member_id,field_id' });
+      if (customSave.error) {
+        setSaving(false);
+        setError('Scheda socio salvata, ma non è stato possibile salvare i campi personalizzati: ' + customSave.error.message);
+        await loadRegistry(true);
+        return;
+      }
+    }
 
     // L'email di contatto è indipendente dall'email dell'account.
     // Viene gestita in member_contacts come contatto email principale.
@@ -856,6 +981,8 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     if (!savedFitp.error) setFitpRecords(savedFitp.data || []);
     if (!savedSports.error) setSportRecords(savedSports.data || []);
     if (!savedMedical.error) setMedicalRecords(savedMedical.data || []);
+    const savedCustom = await supabase.from('member_custom_values').select('field_id,value').eq('member_id', memberId);
+    if (!savedCustom.error) setCustomValues(Object.fromEntries((savedCustom.data || []).map(item => [item.field_id, item.value])));
     await loadRegistry(true);
 
     // Se è stato modificato lo stato associativo di un socio collegato,
@@ -977,12 +1104,28 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
               <h3 style={{margin:0,fontSize:16}}>Campi personalizzati esistenti</h3>
               <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Definizioni presenti in member_custom_fields</p>
             </div>
-            <button type="button" className="password-button" onClick={openConfiguration} disabled={configurationLoading}
-              style={{display:'inline-flex',alignItems:'center',gap:7}}>
-              <RefreshCw size={15}/> Aggiorna
-            </button>
+            <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+              <button type="button" className="password-button" onClick={newCustomField}
+                style={{display:'inline-flex',alignItems:'center',gap:7}}><Plus size={15}/> Nuovo campo</button>
+              <button type="button" className="password-button" onClick={openConfiguration} disabled={configurationLoading}
+                style={{display:'inline-flex',alignItems:'center',gap:7}}><RefreshCw size={15}/> Aggiorna</button>
+            </div>
           </div>
 
+          {customFieldDraft && <div style={{display:'grid',gap:12,padding:14,border:'1px solid #cdddc8',borderRadius:12,background:'#f9fcf7'}}>
+            <strong>{customFieldDraft.id ? 'Modifica campo personalizzato' : 'Crea campo personalizzato'}</strong>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10}}>
+              <Field label="Nome campo" value={customFieldDraft.label} onChange={e=>setCustomFieldDraft(v=>({...v,label:e.target.value}))}/>
+              <Field label="Sezione" value={customFieldDraft.section} onChange={e=>setCustomFieldDraft(v=>({...v,section:e.target.value}))} placeholder="Es. Documenti"/>
+              <label style={labelStyle}>Tipo di dato<select style={fieldStyle} value={customFieldDraft.data_type} disabled={!!customFieldDraft.id} onChange={e=>setCustomFieldDraft(v=>({...v,data_type:e.target.value}))}>{CUSTOM_FIELD_TYPES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+              <Field label="Ordine" type="number" value={customFieldDraft.sort_order} onChange={e=>setCustomFieldDraft(v=>({...v,sort_order:e.target.value}))}/>
+            </div>
+            <label style={labelStyle}>Descrizione<textarea rows={2} style={{...fieldStyle,resize:'vertical'}} value={customFieldDraft.description || ''} onChange={e=>setCustomFieldDraft(v=>({...v,description:e.target.value}))}/></label>
+            {['single_select','multi_select'].includes(customFieldDraft.data_type) && <label style={labelStyle}>Opzioni (una per riga o separate da virgola)<textarea rows={3} style={{...fieldStyle,resize:'vertical'}} value={customFieldDraft.optionsText || ''} onChange={e=>setCustomFieldDraft(v=>({...v,optionsText:e.target.value}))}/></label>}
+            <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>{[['required','Obbligatorio'],['visible','Visibile nella scheda'],['show_in_summary','Mostra nel riepilogo']].map(([key,label])=><label key={key} style={{display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!customFieldDraft[key]} onChange={e=>setCustomFieldDraft(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}</div>
+            {customFieldDraft.id && <small className="muted">Il tipo di dato non è modificabile dopo la creazione, per proteggere i valori già registrati.</small>}
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8}}><button type="button" className="password-button" onClick={()=>setCustomFieldDraft(null)}>Annulla</button><button type="button" className="primary" disabled={customFieldSaving} onClick={saveCustomField}>{customFieldSaving?'Salvataggio…':'Salva campo'}</button></div>
+          </div>}
           {configurationLoading ? <p className="muted">Lettura configurazione…</p>
             : configurationFields.length === 0
               ? <p className="muted" style={{margin:0}}>Nessun campo personalizzato presente. Non sono presenti campi personalizzati.</p>
@@ -994,10 +1137,12 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                         <small className="muted">{item.field_key} · {item.data_type} · sezione: {item.section || 'custom'}</small>
                         {item.description && <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>{item.description}</p>}
                       </div>
-                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end'}}>
-                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.active?'#e8f4e5':'#f1f2f1',color:item.active?'#3f6c37':'#69736b'}}>{item.active?'Attivo':'Disattivo'}</span>
+                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end',alignItems:'center'}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.active?'#e8f4e5':'#f1f2f1',color:item.active?'#3f6c37':'#69736b'}}>{item.active?'Attivo':'Archiviato'}</span>
                         <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.visible?'#e8f0fa':'#f1f2f1',color:item.visible?'#3f5f83':'#69736b'}}>{item.visible?'Visibile':'Nascosto'}</span>
                         {item.required && <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:'#fff3df',color:'#8a5b16'}}>Obbligatorio</span>}
+                        <button type="button" className="password-button" onClick={()=>editCustomField(item)} style={{fontSize:11,padding:'6px 9px'}}>Modifica</button>
+                        <button type="button" className="password-button" onClick={()=>setCustomFieldActive(item,!item.active)} style={{fontSize:11,padding:'6px 9px'}}>{item.active?'Archivia':'Riattiva'}</button>
                       </div>
                     </div>
                   ))}
@@ -1302,6 +1447,22 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                     {showStandardField('sport_notes') && <label style={labelStyle}>Note<input style={fieldStyle} value={item.notes || ''} onChange={e=>updateSportRecord(index,'notes',e.target.value)}/></label>}
                   </div>
                 ))}
+              </div>}
+
+              {configurationFields.filter(field => field.active && field.visible).length > 0 && <div style={{display:'grid',gap:14}}>
+                {Object.entries(configurationFields.filter(field => field.active && field.visible).reduce((groups, field) => { const section = (field.section || 'Altri dati').trim(); (groups[section] ||= []).push(field); return groups; }, {})).map(([section, fields]) => <div key={section} style={{display:'grid',gap:10,padding:13,border:'1px solid #e2e9e1',borderRadius:13,background:'#fbfcfa'}}>
+                  <h4 style={{margin:0,fontSize:13,color:'#557b42'}}>{section.toUpperCase()}</h4>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10}}>
+                    {fields.map(field => { const value = customValues[field.id]; const setValue = next => updateCustomValue(field.id,next); const common = {style:fieldStyle,required:!!field.required};
+                      if (field.data_type === 'boolean') return <label key={field.id} style={{...labelStyle,display:'flex',alignItems:'center',gap:8,padding:'10px 0'}}><input type="checkbox" checked={value === true || value === 'true'} onChange={e=>setValue(e.target.checked)} style={{accentColor:'#557b42',width:17,height:17}}/>{field.label}{field.required?' *':''}</label>;
+                      if (field.data_type === 'single_select') return <label key={field.id} style={labelStyle}>{field.label}{field.required?' *':''}<select {...common} value={value ?? ''} onChange={e=>setValue(e.target.value)}><option value="">Seleziona…</option>{(field.options || []).map(option=><option key={option} value={option}>{option}</option>)}</select></label>;
+                      if (field.data_type === 'multi_select') return <fieldset key={field.id} style={{border:'1px solid #dce4dc',borderRadius:10,padding:10,display:'grid',gap:7}}><legend style={{fontSize:12,fontWeight:700,color:'#526258'}}>{field.label}{field.required?' *':''}</legend>{(field.options || []).map(option=><label key={option} style={{display:'flex',gap:7,alignItems:'center',fontSize:12}}><input type="checkbox" checked={Array.isArray(value) && value.includes(option)} onChange={e=>setValue(e.target.checked?[...(Array.isArray(value)?value:[]),option]:(value||[]).filter(v=>v!==option))}/>{option}</label>)}</fieldset>;
+                      if (field.data_type === 'long_text') return <label key={field.id} style={{...labelStyle,gridColumn:'1/-1'}}>{field.label}{field.required?' *':''}<textarea rows={3} {...common} value={value ?? ''} onChange={e=>setValue(e.target.value)}/></label>;
+                      const inputType = field.data_type === 'date' ? 'date' : ['number','decimal','currency'].includes(field.data_type) ? 'number' : field.data_type === 'email' ? 'email' : field.data_type === 'url' ? 'url' : field.data_type === 'phone' ? 'tel' : 'text';
+                      return <label key={field.id} style={labelStyle}>{field.label}{field.required?' *':''}<input {...common} type={inputType} step={['decimal','currency'].includes(field.data_type)?'0.01':undefined} value={value ?? ''} onChange={e=>setValue(e.target.value)}/></label>;
+                    })}
+                  </div>
+                </div>)}
               </div>}
 
               {showStandardField('internal_notes') && <label style={labelStyle}>
