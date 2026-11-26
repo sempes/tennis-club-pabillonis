@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search, Users, UserRound, Plus, Save, X, RefreshCw,
-  ChevronRight, CalendarDays, ShieldCheck, Settings, ArrowLeft
+  ChevronRight, CalendarDays, ShieldCheck, Settings, ArrowLeft, Trash2
 } from 'lucide-react';
 import { supabase } from './supabase';
 
@@ -196,8 +196,9 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setCustomValues(current => ({ ...current, [fieldId]: value }));
   }
 
-  function newCustomField() {
-    setCustomFieldDraft({ id: null, label: '', description: '', section: 'Documenti', data_type: 'text', optionsText: '', sort_order: (configurationFields.length + 1) * 10, required: false, visible: true, show_in_summary: false, active: true });
+  function newCustomField(section = 'Documenti') {
+    const sameSectionCount = configurationFields.filter(field => (field.section || 'Altri dati').trim().toLowerCase() === section.trim().toLowerCase()).length;
+    setCustomFieldDraft({ id: null, label: '', description: '', section, data_type: 'text', optionsText: '', sort_order: (sameSectionCount + 1) * 10, required: false, visible: true, show_in_summary: false, active: true });
     setConfigurationError('');
     setConfigurationNotice('');
   }
@@ -225,6 +226,11 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     }
     setCustomFieldSaving(true);
     setConfigurationError('');
+    if (customFieldDraft.id && customFieldDraft.data_type !== customFieldDraft.originalType) {
+      const usage = await supabase.from('member_custom_values').select('id', { count: 'exact', head: true }).eq('field_id', customFieldDraft.id);
+      if (usage.error) { setConfigurationError('Impossibile verificare i valori esistenti: ' + usage.error.message); setCustomFieldSaving(false); return; }
+      if ((usage.count || 0) > 0) { setConfigurationError('Non puoi cambiare il tipo di dato perché questo campo contiene già valori. Crea un nuovo campo per usare un tipo diverso.'); setCustomFieldSaving(false); return; }
+    }
     const payload = {
       label, description: (customFieldDraft.description || '').trim() || null,
       section, data_type: customFieldDraft.data_type, options,
@@ -235,7 +241,6 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     };
     let result;
     if (customFieldDraft.id) {
-      // Il tipo resta invariato in modifica per proteggere i valori già registrati.
       result = await supabase.from('member_custom_fields').update(payload).eq('id', customFieldDraft.id);
     } else {
       const slug = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'campo';
@@ -263,6 +268,31 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
       setConfigurationNotice(active ? 'Campo riattivato.' : 'Campo archiviato. I valori esistenti sono conservati.');
       await openConfiguration();
     }
+  }
+
+  async function deleteCustomField(item) {
+    if (!authorized || customFieldSaving) return;
+    const usage = await supabase.from('member_custom_values')
+      .select('id', { count: 'exact', head: true }).eq('field_id', item.id);
+    if (usage.error) {
+      setConfigurationError('Impossibile verificare se il campo contiene valori: ' + usage.error.message);
+      return;
+    }
+    if ((usage.count || 0) > 0) {
+      setConfigurationError('Questo campo contiene già valori associati ai soci. Per sicurezza non può essere eliminato: puoi archiviarlo.');
+      return;
+    }
+    if (!window.confirm(`Eliminare definitivamente il campo “${item.label}”? L’operazione è consentita solo perché non contiene valori.`)) return;
+    setCustomFieldSaving(true);
+    setConfigurationError('');
+    const result = await supabase.from('member_custom_fields').delete().eq('id', item.id);
+    if (result.error) setConfigurationError('Impossibile eliminare il campo: ' + result.error.message);
+    else {
+      setCustomFieldDraft(null);
+      setConfigurationNotice('Campo eliminato definitivamente.');
+      await openConfiguration();
+    }
+    setCustomFieldSaving(false);
   }
 
   async function openConfiguration() {
@@ -1117,33 +1147,42 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10}}>
               <Field label="Nome campo" value={customFieldDraft.label} onChange={e=>setCustomFieldDraft(v=>({...v,label:e.target.value}))}/>
               <Field label="Sezione" value={customFieldDraft.section} onChange={e=>setCustomFieldDraft(v=>({...v,section:e.target.value}))} placeholder="Es. Documenti"/>
-              <label style={labelStyle}>Tipo di dato<select style={fieldStyle} value={customFieldDraft.data_type} disabled={!!customFieldDraft.id} onChange={e=>setCustomFieldDraft(v=>({...v,data_type:e.target.value}))}>{CUSTOM_FIELD_TYPES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+              <label style={labelStyle}>Tipo di dato<select style={fieldStyle} value={customFieldDraft.data_type} onChange={e=>setCustomFieldDraft(v=>({...v,data_type:e.target.value}))}>{CUSTOM_FIELD_TYPES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
               <Field label="Ordine" type="number" value={customFieldDraft.sort_order} onChange={e=>setCustomFieldDraft(v=>({...v,sort_order:e.target.value}))}/>
             </div>
             <label style={labelStyle}>Descrizione<textarea rows={2} style={{...fieldStyle,resize:'vertical'}} value={customFieldDraft.description || ''} onChange={e=>setCustomFieldDraft(v=>({...v,description:e.target.value}))}/></label>
             {['single_select','multi_select'].includes(customFieldDraft.data_type) && <label style={labelStyle}>Opzioni (una per riga o separate da virgola)<textarea rows={3} style={{...fieldStyle,resize:'vertical'}} value={customFieldDraft.optionsText || ''} onChange={e=>setCustomFieldDraft(v=>({...v,optionsText:e.target.value}))}/></label>}
             <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>{[['required','Obbligatorio'],['visible','Visibile nella scheda'],['show_in_summary','Mostra nel riepilogo']].map(([key,label])=><label key={key} style={{display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!customFieldDraft[key]} onChange={e=>setCustomFieldDraft(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}</div>
-            {customFieldDraft.id && <small className="muted">Il tipo di dato non è modificabile dopo la creazione, per proteggere i valori già registrati.</small>}
+            {customFieldDraft.id && <small className="muted">Puoi modificare il tipo solo se il campo non contiene ancora valori. Se sono già presenti valori, il salvataggio impedirà il cambio per proteggerli.</small>}
             <div style={{display:'flex',justifyContent:'flex-end',gap:8}}><button type="button" className="password-button" onClick={()=>setCustomFieldDraft(null)}>Annulla</button><button type="button" className="primary" disabled={customFieldSaving} onClick={saveCustomField}>{customFieldSaving?'Salvataggio…':'Salva campo'}</button></div>
           </div>}
           {configurationLoading ? <p className="muted">Lettura configurazione…</p>
             : configurationFields.length === 0
               ? <p className="muted" style={{margin:0}}>Nessun campo personalizzato presente. Non sono presenti campi personalizzati.</p>
-              : <div style={{display:'grid',gap:8}}>
-                  {configurationFields.map(item => (
-                    <div key={item.id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:12,border:'1px solid #e7ece5',borderRadius:11,background:'#fbfcfa'}}>
-                      <div style={{minWidth:0}}>
-                        <strong style={{display:'block',color:'#304338',fontSize:13}}>{item.label}</strong>
-                        <small className="muted">{item.field_key} · {item.data_type} · sezione: {item.section || 'custom'}</small>
-                        {item.description && <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>{item.description}</p>}
+              : <div style={{display:'grid',gap:14}}>
+                  {Object.entries(configurationFields.reduce((groups, item) => { const section = (item.section || 'Altri dati').trim(); (groups[section] ||= []).push(item); return groups; }, {})).map(([section, items]) => (
+                    <div key={section} style={{display:'grid',gap:8,padding:12,border:'1px solid #dfe8dc',borderRadius:13,background:'#fbfdf9'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
+                        <strong style={{fontSize:13,color:'#42663d'}}>{section}</strong>
+                        <button type="button" className="password-button" onClick={()=>newCustomField(section)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,padding:'6px 9px'}}><Plus size={13}/> Aggiungi casella in questa sezione</button>
                       </div>
-                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end',alignItems:'center'}}>
-                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.active?'#e8f4e5':'#f1f2f1',color:item.active?'#3f6c37':'#69736b'}}>{item.active?'Attivo':'Archiviato'}</span>
-                        <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.visible?'#e8f0fa':'#f1f2f1',color:item.visible?'#3f5f83':'#69736b'}}>{item.visible?'Visibile':'Nascosto'}</span>
-                        {item.required && <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:'#fff3df',color:'#8a5b16'}}>Obbligatorio</span>}
-                        <button type="button" className="password-button" onClick={()=>editCustomField(item)} style={{fontSize:11,padding:'6px 9px'}}>Modifica</button>
-                        <button type="button" className="password-button" onClick={()=>setCustomFieldActive(item,!item.active)} style={{fontSize:11,padding:'6px 9px'}}>{item.active?'Archivia':'Riattiva'}</button>
-                      </div>
+                      {items.map(item => (
+                        <div key={item.id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:12,border:'1px solid #e7ece5',borderRadius:11,background:'#fff'}}>
+                          <div style={{minWidth:0}}>
+                            <strong style={{display:'block',color:'#304338',fontSize:13}}>{item.label}</strong>
+                            <small className="muted">{item.field_key} · {item.data_type}</small>
+                            {item.description && <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>{item.description}</p>}
+                          </div>
+                          <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end',alignItems:'center'}}>
+                            <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.active?'#e8f4e5':'#f1f2f1',color:item.active?'#3f6c37':'#69736b'}}>{item.active?'Attivo':'Archiviato'}</span>
+                            <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:item.visible?'#e8f0fa':'#f1f2f1',color:item.visible?'#3f5f83':'#69736b'}}>{item.visible?'Visibile':'Nascosto'}</span>
+                            {item.required && <span style={{fontSize:10,fontWeight:700,padding:'4px 7px',borderRadius:20,background:'#fff3df',color:'#8a5b16'}}>Obbligatorio</span>}
+                            <button type="button" className="password-button" onClick={()=>editCustomField(item)} style={{fontSize:11,padding:'6px 9px'}}>Modifica</button>
+                            <button type="button" className="password-button" onClick={()=>setCustomFieldActive(item,!item.active)} style={{fontSize:11,padding:'6px 9px'}}>{item.active?'Archivia':'Riattiva'}</button>
+                            <button type="button" className="password-button" onClick={()=>deleteCustomField(item)} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11,padding:'6px 9px',color:'#a33d35'}}><Trash2 size={13}/> Elimina</button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>}
