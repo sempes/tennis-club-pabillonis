@@ -209,7 +209,7 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     setConfigurationNotice('');
   }
 
-  async function saveCustomField() {
+  async function saveCustomField(addAnother = false) {
     if (!authorized || customFieldSaving || !customFieldDraft) return;
     const label = (customFieldDraft.label || '').trim();
     const section = (customFieldDraft.section || '').trim();
@@ -251,9 +251,15 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
     if (result.error) {
       setConfigurationError('Impossibile salvare il campo: ' + result.error.message);
     } else {
+      const savedSection = section;
+      const savedOrder = Number(customFieldDraft.sort_order) || 0;
       setCustomFieldDraft(null);
       setConfigurationNotice('Campo personalizzato salvato.');
       await openConfiguration();
+      if (addAnother) {
+        setCustomFieldDraft({ id: null, label: '', description: '', section: savedSection, data_type: 'text', optionsText: '', sort_order: savedOrder + 10, required: false, visible: true, show_in_summary: false, active: true });
+        setConfigurationNotice('Campo salvato. Puoi inserire la casella successiva nella stessa sezione.');
+      }
     }
     setCustomFieldSaving(false);
   }
@@ -1135,7 +1141,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
               <p className="muted" style={{margin:'4px 0 0',fontSize:12}}>Definizioni presenti in member_custom_fields</p>
             </div>
             <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
-              <button type="button" className="password-button" onClick={newCustomField}
+              <button type="button" className="password-button" onClick={()=>newCustomField()}
                 style={{display:'inline-flex',alignItems:'center',gap:7}}><Plus size={15}/> Nuovo campo</button>
               <button type="button" className="password-button" onClick={openConfiguration} disabled={configurationLoading}
                 style={{display:'inline-flex',alignItems:'center',gap:7}}><RefreshCw size={15}/> Aggiorna</button>
@@ -1154,7 +1160,13 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
             {['single_select','multi_select'].includes(customFieldDraft.data_type) && <label style={labelStyle}>Opzioni (una per riga o separate da virgola)<textarea rows={3} style={{...fieldStyle,resize:'vertical'}} value={customFieldDraft.optionsText || ''} onChange={e=>setCustomFieldDraft(v=>({...v,optionsText:e.target.value}))}/></label>}
             <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>{[['required','Obbligatorio'],['visible','Visibile nella scheda'],['show_in_summary','Mostra nel riepilogo']].map(([key,label])=><label key={key} style={{display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!customFieldDraft[key]} onChange={e=>setCustomFieldDraft(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}</div>
             {customFieldDraft.id && <small className="muted">Puoi modificare il tipo solo se il campo non contiene ancora valori. Se sono già presenti valori, il salvataggio impedirà il cambio per proteggerli.</small>}
-            <div style={{display:'flex',justifyContent:'flex-end',gap:8}}><button type="button" className="password-button" onClick={()=>setCustomFieldDraft(null)}>Annulla</button><button type="button" className="primary" disabled={customFieldSaving} onClick={saveCustomField}>{customFieldSaving?'Salvataggio…':'Salva campo'}</button></div>
+            <div style={{display:'flex',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
+              <button type="button" className="password-button" onClick={()=>setCustomFieldDraft(null)}>Annulla</button>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:8,flexWrap:'wrap'}}>
+                {!customFieldDraft.id && <button type="button" className="password-button" disabled={customFieldSaving} onClick={()=>saveCustomField(true)}><Plus size={14}/> Salva e aggiungi casella</button>}
+                <button type="button" className="primary" disabled={customFieldSaving} onClick={()=>saveCustomField(false)}>{customFieldSaving?'Salvataggio…':'Salva campo'}</button>
+              </div>
+            </div>
           </div>}
           {configurationLoading ? <p className="muted">Lettura configurazione…</p>
             : configurationFields.length === 0
