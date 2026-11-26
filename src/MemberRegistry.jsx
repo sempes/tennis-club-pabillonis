@@ -1236,7 +1236,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                     <p className="muted" style={{margin:'4px 0 0',fontSize:11}}>Gestione riservata al super amministratore. Le registrazioni precedenti vengono conservate.</p>
                   </div>
                   {!currentMedical ? (
-                    <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Inserisci certificato</button>
+                    <button type="button" className="password-button" onClick={addMedicalRecord} style={{display:'inline-flex',alignItems:'center',gap:6,marginLeft:'auto'}}><Plus size={14}/>Inserisci certificato</button>
                   ) : (
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginLeft:'auto'}}>
                       <button type="button" className="password-button" onClick={() => setMedicalEditing(true)} style={{display:'inline-flex',alignItems:'center',gap:6}}>Modifica</button>
