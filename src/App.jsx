@@ -2077,7 +2077,7 @@ async function deleteAdmin(id){
           onClick={()=>setActiveView('announcements')}
           style={{display:'flex',alignItems:'center',justifyContent:'flex-start',gap:'10px',whiteSpace:'nowrap',height:'42px',minHeight:'42px',maxHeight:'42px',boxSizing:'border-box',padding:'0 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap',overflow:'hidden'}}>
           <Bell size={18} style={{flex:'0 0 auto'}}/>
-          <span style={{whiteSpace:'nowrap'}}>Aggiornamenti</span>
+          <span style={{whiteSpace:'nowrap',color:activeView==='announcements'?'#c6df75':'#24352b'}}>Aggiornamenti</span>
           {announcements.filter(item => !announcementReadIds.includes(item.id)).length > 0 &&
             <span style={{
               marginLeft:'auto', minWidth:'20px', height:'20px', padding:'0 6px',
@@ -2095,7 +2095,7 @@ async function deleteAdmin(id){
           className={activeView==='fitpExpiry'?'nav-active nav-button':'nav-button'}
           onClick={()=>setActiveView('fitpExpiry')}
           style={{height:'auto',minHeight:'42px',boxSizing:'border-box',display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',fontSize:'14px',lineHeight:1.2,flexWrap:'nowrap'}}>
-          <CalendarDays size={18}/> {isSuperAdmin ? 'Scadenze FITP' : 'Le mie scadenze'}
+          <CalendarDays size={18}/> {isSuperAdmin ? 'Scadenze soci' : 'Le mie scadenze'}
         </button>}
 
         {isSuperAdmin&&<button type="button"
