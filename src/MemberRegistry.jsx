@@ -197,8 +197,9 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
   }
 
   function newCustomField(section = 'Documenti') {
-    const sameSectionCount = configurationFields.filter(field => (field.section || 'Altri dati').trim().toLowerCase() === section.trim().toLowerCase()).length;
-    setCustomFieldDraft({ id: null, label: '', description: '', section, data_type: 'text', optionsText: '', sort_order: (sameSectionCount + 1) * 10, required: false, visible: true, show_in_summary: false, active: true });
+    const sectionName = String(section || 'Documenti').trim() || 'Documenti';
+    const sameSectionCount = configurationFields.filter(field => String(field.section || 'Altri dati').trim().toLowerCase() === sectionName.toLowerCase()).length;
+    setCustomFieldDraft({ id: null, label: '', description: '', section: sectionName, data_type: 'text', optionsText: '', sort_order: (sameSectionCount + 1) * 10, required: false, visible: true, show_in_summary: false, active: true });
     setConfigurationError('');
     setConfigurationNotice('');
   }
@@ -1084,9 +1085,6 @@ export default function MemberRegistry({ profile, members = [], onRegistrySaved 
 Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. Nascondere un campo non elimina né modifica il valore già registrato nel database. Le modifiche si applicano alla scheda anagrafica. I campi nascosti conservano tutti i valori già registrati.
         </div>
 
-        {configurationError && <div role="alert" style={{padding:12,borderRadius:10,background:'#fff1ef',color:'#963c32'}}>{configurationError}</div>}
-
-        {configurationNotice && <div role="status" style={{padding:12,borderRadius:10,background:'#edf7e9',color:'#3f6c37',fontSize:13}}>{configurationNotice}</div>}
 
         <div style={{border:'1px solid #e2e9e1',borderRadius:16,padding:16,background:'#fff',display:'grid',gap:14}}>
           <div>
@@ -1148,6 +1146,9 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
             </div>
           </div>
 
+          {configurationError && <div role="alert" style={{padding:12,borderRadius:10,background:'#fff1ef',color:'#963c32',fontSize:13}}>{configurationError}</div>}
+          {configurationNotice && <div role="status" style={{padding:12,borderRadius:10,background:'#edf7e9',color:'#3f6c37',fontSize:13}}>{configurationNotice}</div>}
+
           {customFieldDraft && <div style={{display:'grid',gap:12,padding:14,border:'1px solid #cdddc8',borderRadius:12,background:'#f9fcf7'}}>
             <strong>{customFieldDraft.id ? 'Modifica campo personalizzato' : 'Crea campo personalizzato'}</strong>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10}}>
@@ -1176,7 +1177,7 @@ Le opzioni qui sotto memorizzano soltanto quali campi dovranno essere mostrati. 
                     <div key={section} style={{display:'grid',gap:8,padding:12,border:'1px solid #dfe8dc',borderRadius:13,background:'#fbfdf9'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
                         <strong style={{fontSize:13,color:'#42663d'}}>{section}</strong>
-                        <button type="button" className="password-button" onClick={()=>newCustomField(section)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,padding:'6px 9px'}}><Plus size={13}/> Aggiungi casella in questa sezione</button>
+                        <button type="button" className="password-button" onClick={event=>{event.preventDefault();event.stopPropagation();newCustomField(String(section || 'Documenti'));}} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,padding:'6px 9px'}}><Plus size={13}/> Aggiungi casella in questa sezione</button>
                       </div>
                       {items.map(item => (
                         <div key={item.id} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:10,alignItems:'center',padding:12,border:'1px solid #e7ece5',borderRadius:11,background:'#fff'}}>
